@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Mission Control | Scenario Library</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Newsreader:ital,wght@0,400;0,600;0,700;1,400;1,600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-primary": "#faf7f6",
+              "on-secondary": "#f6f9ff",
+              "surface-tint": "#5f5e5e",
+              "surface-container-highest": "#e0e3e0",
+              "tertiary-fixed": "#fed57b",
+              "secondary-dim": "#4f5358",
+              "on-primary-fixed-variant": "#5c5b5b",
+              "surface-dim": "#d6dbd7",
+              "secondary-fixed-dim": "#d1d5da",
+              "inverse-primary": "#ffffff",
+              "on-secondary-fixed-variant": "#585c61",
+              "tertiary": "#785b09",
+              "on-error-container": "#752121",
+              "surface-container-high": "#e6e9e6",
+              "error-container": "#fe8983",
+              "on-surface-variant": "#5c605d",
+              "on-secondary-container": "#4e5257",
+              "tertiary-dim": "#6a4f00",
+              "on-secondary-fixed": "#3c4044",
+              "error-dim": "#4e0309",
+              "on-primary-container": "#525151",
+              "primary-fixed-dim": "#d6d4d3",
+              "primary-dim": "#535252",
+              "on-tertiary": "#fff8f0",
+              "on-background": "#2f3331",
+              "primary": "#5f5e5e",
+              "error": "#9f403d",
+              "primary-container": "#e5e2e1",
+              "surface-variant": "#e0e3e0",
+              "inverse-surface": "#0d0e0e",
+              "surface-bright": "#faf9f7",
+              "on-surface": "#2f3331",
+              "outline-variant": "#afb3b0",
+              "on-tertiary-fixed": "#4b3700",
+              "on-primary-fixed": "#403f3f",
+              "surface": "#faf9f7",
+              "secondary": "#5b5f64",
+              "outline": "#777c79",
+              "background": "#faf9f7",
+              "on-tertiary-fixed-variant": "#6e5200",
+              "tertiary-container": "#fed57b",
+              "secondary-fixed": "#dfe3e8",
+              "tertiary-fixed-dim": "#efc76f",
+              "surface-container": "#edeeeb",
+              "on-tertiary-container": "#624900",
+              "inverse-on-surface": "#9d9d9b",
+              "primary-fixed": "#e5e2e1",
+              "on-error": "#fff7f6",
+              "secondary-container": "#dfe3e8",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-low": "#f3f4f1"
+            },
+            fontFamily: {
+              "headline": ["Newsreader", "serif"],
+              "body": ["Inter", "sans-serif"],
+              "label": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .ruled-divider {
+            border-bottom: 1px solid rgba(175, 179, 176, 0.2);
+        }
+        .forensic-shadow {
+            box-shadow: 0px 0px 24px rgba(13, 14, 14, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface flex min-h-screen">
+<!-- SideNavBar (Shared Component Anchor) -->
+<aside class="fixed left-0 top-0 h-full flex flex-col py-8 px-4 z-40 bg-[#f3f4f1] dark:bg-[#121416] w-64 border-r-0">
+<div class="mb-10 px-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-primary flex items-center justify-center rounded-sm">
+<span class="material-symbols-outlined text-on-primary text-lg" data-icon="terminal">terminal</span>
+</div>
+<div>
+<h2 class="font-headline text-lg leading-none text-[#5f5e5e] dark:text-white">Scenario Library</h2>
+<p class="font-label text-[10px] uppercase tracking-widest text-[#5f5e5e]/60">QA Command Center</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm text-[#5f5e5e]/70 dark:text-[#afb3b0]/70 hover:bg-[#faf9f7] dark:hover:bg-[#1A1C1E]/50 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="edit_note">edit_note</span>
+<span class="font-label font-medium text-sm">Draft</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm text-[#5f5e5e]/70 dark:text-[#afb3b0]/70 hover:bg-[#faf9f7] dark:hover:bg-[#1A1C1E]/50 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="monitoring">monitoring</span>
+<span class="font-label font-medium text-sm">Monitor</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm text-[#5f5e5e]/70 dark:text-[#afb3b0]/70 hover:bg-[#faf9f7] dark:hover:bg-[#1A1C1E]/50 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="rate_review">rate_review</span>
+<span class="font-label font-medium text-sm">Review</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm bg-[#ffffff] dark:bg-[#1A1C1E] text-[#5f5e5e] dark:text-white font-bold border-l-4 border-[#5f5e5e] translate-x-1 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="inventory_2">inventory_2</span>
+<span class="font-label font-medium text-sm">Library</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-outline-variant/10 pt-6 space-y-1">
+<button class="w-full mb-6 bg-primary text-on-primary py-2.5 px-4 text-sm font-bold flex items-center justify-center gap-2 rounded-sm active:scale-[0.98] transition-transform">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+                New Scenario
+            </button>
+<a class="flex items-center gap-3 px-4 py-2 text-[#5f5e5e]/70 dark:text-[#afb3b0]/70 hover:bg-[#faf9f7] transition-all" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="archive">archive</span>
+<span class="font-label text-sm">Archives</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-[#5f5e5e]/70 dark:text-[#afb3b0]/70 hover:bg-[#faf9f7] transition-all" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="settings">settings</span>
+<span class="font-label text-sm">Settings</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 flex-1 flex flex-col min-w-0">
+<!-- TopNavBar (Shared Component Anchor) -->
+<header class="flex justify-between items-center w-full px-8 py-3 h-16 bg-[#faf9f7] dark:bg-[#1A1C1E]">
+<div class="flex items-center gap-2">
+<span class="font-headline italic text-2xl text-[#5f5e5e] dark:text-white tracking-tighter">Mission Control</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative hidden lg:block">
+<span class="absolute inset-y-0 left-3 flex items-center text-outline">
+<span class="material-symbols-outlined text-sm" data-icon="search">search</span>
+</span>
+<input class="bg-surface-container-low border-none text-[11px] font-label tracking-wider uppercase pl-10 pr-4 py-1.5 w-64 focus:ring-1 focus:ring-primary" placeholder="QUERY LEDGER..." type="text"/>
+</div>
+<div class="flex items-center gap-4 text-[#5f5e5e] dark:text-[#afb3b0]">
+<button class="hover:bg-[#f3f4f1] p-1.5 rounded-sm transition-colors"><span class="material-symbols-outlined" data-icon="notifications">notifications</span></button>
+<button class="hover:bg-[#f3f4f1] p-1.5 rounded-sm transition-colors"><span class="material-symbols-outlined" data-icon="settings">settings</span></button>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="professional portrait of a technical systems operator in a modern office setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDk8wZ8H5_g9uXAUc_-k7iQ6z6wHwn9xP8gyqQvuhye-UeMTEitQ2CIDYtVZnQVSghYu9r9b_IGt3lP2HoTKeQbKe0S3Cd2l9dYTf4ACc0Zs-lzylPFC2yZB_f4gs6XosguDsZquOHd-owOPalyPakUYZp1E4alG3hCyUtwGmgsEpMbd2XNCAe5brGVCFSK3pi273owClNnsTt6HMXPv9_jGc1RivC-8jee8xMNAU_tN_wtSHeG1hImgBcCujolSBhOWjU9Hq5hTjs"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Dashboard Content -->
+<div class="p-8 flex-1 flex gap-8">
+<section class="flex-1 space-y-8">
+<!-- Header & Global Actions -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 ruled-divider">
+<div class="max-w-2xl">
+<h1 class="font-headline text-5xl font-bold tracking-tight text-on-surface mb-2">Scenario Library</h1>
+<p class="text-on-surface-variant font-serif italic text-lg opacity-80">Curated repository of reusable mission templates and verified execution logic.</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="bg-surface-container-high px-4 py-2 text-[11px] font-label font-bold uppercase tracking-widest hover:bg-surface-container-highest transition-colors">Import JSON</button>
+<button class="bg-surface-container-high px-4 py-2 text-[11px] font-label font-bold uppercase tracking-widest hover:bg-surface-container-highest transition-colors">Bulk Archive</button>
+<button class="bg-primary text-on-primary px-5 py-2 text-[11px] font-label font-bold uppercase tracking-widest hover:opacity-90 transition-opacity flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="add_circle">add_circle</span>
+                            Create New Scenario
+                        </button>
+</div>
+</div>
+<!-- Filters -->
+<div class="flex flex-wrap items-center gap-4 p-4 bg-surface-container-low rounded-sm">
+<span class="font-label text-[10px] font-bold uppercase tracking-widest text-outline">Filter Evidence:</span>
+<div class="flex gap-2">
+<select class="bg-surface-container-lowest border-none text-[11px] font-label uppercase tracking-wider py-1 pl-3 pr-8 focus:ring-1 focus:ring-primary cursor-pointer">
+<option>Feature Area</option>
+<option>Identity</option>
+<option>Payment</option>
+<option>Infrastructure</option>
+</select>
+<select class="bg-surface-container-lowest border-none text-[11px] font-label uppercase tracking-wider py-1 pl-3 pr-8 focus:ring-1 focus:ring-primary cursor-pointer">
+<option>Risk Profile</option>
+<option>High</option>
+<option>Medium</option>
+<option>Low</option>
+</select>
+<select class="bg-surface-container-lowest border-none text-[11px] font-label uppercase tracking-wider py-1 pl-3 pr-8 focus:ring-1 focus:ring-primary cursor-pointer">
+<option>Author</option>
+<option>A. Chen</option>
+<option>M. Rossi</option>
+</select>
+</div>
+</div>
+<!-- Scenario Bento Grid -->
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+<!-- Scenario Card 1 (Active/Selected) -->
+<div class="bg-surface-container-lowest p-6 border-l-4 border-primary forensic-shadow transition-transform hover:scale-[1.01] cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="font-headline text-xl font-bold mb-1">Auth Gateway Redirect (v2.4)</h3>
+<div class="flex items-center gap-3">
+<span class="font-label text-[10px] font-bold uppercase px-2 py-0.5 bg-error/10 text-error">High Risk</span>
+<span class="font-label text-[10px] text-on-surface-variant">12 Steps</span>
+<span class="font-label text-[10px] text-on-surface-variant italic">Last run 2h ago</span>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_arrow">play_arrow</span></button>
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="history">history</span></button>
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="more_vert">more_vert</span></button>
+</div>
+</div>
+<div class="ruled-divider my-4"></div>
+<div class="flex items-end justify-between gap-6">
+<div class="flex-1">
+<p class="font-label text-[10px] font-bold uppercase text-outline mb-2">Success Velocity (10 Runs)</p>
+<div class="h-10 flex items-end gap-1">
+<div class="w-full bg-emerald-500 h-[90%]"></div>
+<div class="w-full bg-emerald-500 h-[85%]"></div>
+<div class="w-full bg-error h-[30%]"></div>
+<div class="w-full bg-emerald-500 h-[95%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[90%]"></div>
+<div class="w-full bg-error h-[10%]"></div>
+<div class="w-full bg-emerald-500 h-[92%]"></div>
+<div class="w-full bg-emerald-500 h-[88%]"></div>
+<div class="w-full bg-emerald-500 h-[96%]"></div>
+</div>
+</div>
+<div class="flex flex-wrap gap-2 justify-end w-1/2">
+<span class="text-[9px] font-label uppercase tracking-widest bg-surface-container-high px-2 py-0.5 text-on-surface-variant">#Identity</span>
+<span class="text-[9px] font-label uppercase tracking-widest bg-surface-container-high px-2 py-0.5 text-on-surface-variant">#Security</span>
+<span class="text-[9px] font-label uppercase tracking-widest bg-surface-container-high px-2 py-0.5 text-on-surface-variant">#Alpha-Protocol</span>
+</div>
+</div>
+</div>
+<!-- Scenario Card 2 -->
+<div class="bg-surface-container-lowest p-6 border-l-4 border-transparent hover:border-outline-variant/50 transition-all hover:bg-white cursor-pointer border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="font-headline text-xl font-bold mb-1">Stripe Webhook Listener</h3>
+<div class="flex items-center gap-3">
+<span class="font-label text-[10px] font-bold uppercase px-2 py-0.5 bg-tertiary/10 text-tertiary">Med Risk</span>
+<span class="font-label text-[10px] text-on-surface-variant">8 Steps</span>
+<span class="font-label text-[10px] text-on-surface-variant italic">Last run 1d ago</span>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_arrow">play_arrow</span></button>
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="history">history</span></button>
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="more_vert">more_vert</span></button>
+</div>
+</div>
+<div class="ruled-divider my-4"></div>
+<div class="flex items-end justify-between gap-6">
+<div class="flex-1">
+<p class="font-label text-[10px] font-bold uppercase text-outline mb-2">Success Velocity (10 Runs)</p>
+<div class="h-10 flex items-end gap-1">
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[95%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+</div>
+</div>
+<div class="flex flex-wrap gap-2 justify-end w-1/2">
+<span class="text-[9px] font-label uppercase tracking-widest bg-surface-container-high px-2 py-0.5 text-on-surface-variant">#Payments</span>
+<span class="text-[9px] font-label uppercase tracking-widest bg-surface-container-high px-2 py-0.5 text-on-surface-variant">#Stripe</span>
+</div>
+</div>
+</div>
+<!-- Scenario Card 3 -->
+<div class="bg-surface-container-lowest p-6 border-l-4 border-transparent hover:border-outline-variant/50 transition-all hover:bg-white cursor-pointer border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="font-headline text-xl font-bold mb-1">Cold Storage Cleanup Task</h3>
+<div class="flex items-center gap-3">
+<span class="font-label text-[10px] font-bold uppercase px-2 py-0.5 bg-surface-variant text-on-surface-variant">Low Risk</span>
+<span class="font-label text-[10px] text-on-surface-variant">4 Steps</span>
+<span class="font-label text-[10px] text-on-surface-variant italic">Last run 5m ago</span>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_arrow">play_arrow</span></button>
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="history">history</span></button>
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="more_vert">more_vert</span></button>
+</div>
+</div>
+<div class="ruled-divider my-4"></div>
+<div class="flex items-end justify-between gap-6">
+<div class="flex-1">
+<p class="font-label text-[10px] font-bold uppercase text-outline mb-2">Success Velocity (10 Runs)</p>
+<div class="h-10 flex items-end gap-1">
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-error h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-error h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+<div class="w-full bg-error h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+</div>
+</div>
+<div class="flex flex-wrap gap-2 justify-end w-1/2">
+<span class="text-[9px] font-label uppercase tracking-widest bg-surface-container-high px-2 py-0.5 text-on-surface-variant">#Infrastructure</span>
+<span class="text-[9px] font-label uppercase tracking-widest bg-surface-container-high px-2 py-0.5 text-on-surface-variant">#AWS</span>
+</div>
+</div>
+</div>
+<!-- Scenario Card 4 -->
+<div class="bg-surface-container-lowest p-6 border-l-4 border-transparent hover:border-outline-variant/50 transition-all hover:bg-white cursor-pointer border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="font-headline text-xl font-bold mb-1">Mobile Deep-Link Handshake</h3>
+<div class="flex items-center gap-3">
+<span class="font-label text-[10px] font-bold uppercase px-2 py-0.5 bg-error/10 text-error">High Risk</span>
+<span class="font-label text-[10px] text-on-surface-variant">24 Steps</span>
+<span class="font-label text-[10px] text-on-surface-variant italic">Last run 6h ago</span>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_arrow">play_arrow</span></button>
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="history">history</span></button>
+<button class="p-2 hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-lg" data-icon="more_vert">more_vert</span></button>
+</div>
+</div>
+<div class="ruled-divider my-4"></div>
+<div class="flex items-end justify-between gap-6">
+<div class="flex-1">
+<p class="font-label text-[10px] font-bold uppercase text-outline mb-2">Success Velocity (10 Runs)</p>
+<div class="h-10 flex items-end gap-1">
+<div class="w-full bg-emerald-500 h-[40%]"></div>
+<div class="w-full bg-error h-[100%]"></div>
+<div class="w-full bg-error h-[100%]"></div>
+<div class="w-full bg-error h-[100%]"></div>
+<div class="w-full bg-error h-[100%]"></div>
+<div class="w-full bg-error h-[100%]"></div>
+<div class="w-full bg-emerald-500 h-[60%]"></div>
+<div class="w-full bg-emerald-500 h-[80%]"></div>
+<div class="w-full bg-emerald-500 h-[90%]"></div>
+<div class="w-full bg-emerald-500 h-[100%]"></div>
+</div>
+</div>
+<div class="flex flex-wrap gap-2 justify-end w-1/2">
+<span class="text-[9px] font-label uppercase tracking-widest bg-surface-container-high px-2 py-0.5 text-on-surface-variant">#Mobile</span>
+<span class="text-[9px] font-label uppercase tracking-widest bg-surface-container-high px-2 py-0.5 text-on-surface-variant">#DeepLink</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Detail/Preview Sidebar -->
+<aside class="w-96 bg-surface-container-low p-6 flex flex-col forensic-shadow border-l border-outline-variant/10">
+<div class="flex items-center justify-between mb-8">
+<span class="font-label text-[11px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span>
+                        Evidence Preview
+                    </span>
+<button class="text-outline hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto space-y-8 pr-2">
+<div>
+<h4 class="font-label text-[10px] font-bold uppercase tracking-widest text-outline mb-4 flex items-center gap-2">
+<span class="w-4 h-[1px] bg-outline-variant/50"></span>
+                            Plain-Text Steps
+                        </h4>
+<div class="font-mono text-xs space-y-3 text-on-surface/80">
+<div class="flex gap-4">
+<span class="text-outline/50">01</span>
+<span>Navigate to /auth/login</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline/50">02</span>
+<span>Inject valid credentials context 'admin_v4'</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline/50">03</span>
+<span>Intercept POST /api/v1/session</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline/50">04</span>
+<span>Validate redirection to /dashboard?role=admin</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline/50">05</span>
+<span>Check header 'X-Identity-Token' presence</span>
+</div>
+<div class="flex gap-4 italic text-outline">
+<span class="text-outline/50">...</span>
+<span>[+7 hidden steps]</span>
+</div>
+</div>
+</div>
+<div>
+<h4 class="font-label text-[10px] font-bold uppercase tracking-widest text-outline mb-4 flex items-center gap-2">
+<span class="w-4 h-[1px] bg-outline-variant/50"></span>
+                            Expected Outcomes
+                        </h4>
+<ul class="space-y-3">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-emerald-600 text-sm mt-0.5" data-icon="check_circle">check_circle</span>
+<span class="text-xs">HTTP 302 found on successful authentication</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-emerald-600 text-sm mt-0.5" data-icon="check_circle">check_circle</span>
+<span class="text-xs">Session cookie duration matched 3600s</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-emerald-600 text-sm mt-0.5" data-icon="check_circle">check_circle</span>
+<span class="text-xs">CORS origin strictly validated against whitelist</span>
+</li>
+</ul>
+</div>
+<div>
+<h4 class="font-label text-[10px] font-bold uppercase tracking-widest text-outline mb-4 flex items-center gap-2">
+<span class="w-4 h-[1px] bg-outline-variant/50"></span>
+                            Linked Missions
+                        </h4>
+<div class="space-y-2">
+<div class="bg-surface-container-lowest p-3 border border-outline-variant/10 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="rocket_launch">rocket_launch</span>
+<span class="text-xs font-bold">Q4 Infrastructure Burn-in</span>
+</div>
+<span class="material-symbols-outlined text-sm text-outline" data-icon="open_in_new">open_in_new</span>
+</div>
+<div class="bg-surface-container-lowest p-3 border border-outline-variant/10 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="rocket_launch">rocket_launch</span>
+<span class="text-xs font-bold">Soc2 Compliance Sweep</span>
+</div>
+<span class="material-symbols-outlined text-sm text-outline" data-icon="open_in_new">open_in_new</span>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-8 space-y-3">
+<button class="w-full bg-primary text-on-primary font-label text-[11px] font-bold uppercase tracking-widest py-3 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="play_circle">play_circle</span>
+                        Initiate Scenario
+                    </button>
+<button class="w-full bg-surface-container-high text-on-surface font-label text-[11px] font-bold uppercase tracking-widest py-3 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="edit">edit</span>
+                        Enter Editor
+                    </button>
+</div>
+</aside>
+</div>
+</main>
+</body></html>

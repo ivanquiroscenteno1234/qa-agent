@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>QA Command Center - Monitor</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,700;1,6..72,400&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "error": "#9f403d",
+              "primary-fixed": "#e5e2e1",
+              "on-surface-variant": "#5c605d",
+              "secondary-container": "#dfe3e8",
+              "surface-container": "#edeeeb",
+              "on-error": "#fff7f6",
+              "on-primary-container": "#525151",
+              "on-secondary-container": "#4e5257",
+              "surface-tint": "#5f5e5e",
+              "secondary-fixed": "#dfe3e8",
+              "on-primary": "#faf7f6",
+              "tertiary-dim": "#6a4f00",
+              "primary-dim": "#535252",
+              "on-secondary": "#f6f9ff",
+              "surface": "#faf9f7",
+              "on-tertiary-container": "#624900",
+              "surface-container-highest": "#e0e3e0",
+              "background": "#faf9f7",
+              "surface-dim": "#d6dbd7",
+              "primary-fixed-dim": "#d6d4d3",
+              "on-secondary-fixed": "#3c4044",
+              "on-tertiary-fixed-variant": "#6e5200",
+              "tertiary-fixed": "#fed57b",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-low": "#f3f4f1",
+              "on-surface": "#2f3331",
+              "outline-variant": "#afb3b0",
+              "error-dim": "#4e0309",
+              "inverse-surface": "#0d0e0e",
+              "primary": "#5f5e5e",
+              "surface-container-high": "#e6e9e6",
+              "surface-bright": "#faf9f7",
+              "inverse-primary": "#ffffff",
+              "on-background": "#2f3331",
+              "secondary-dim": "#4f5358",
+              "primary-container": "#e5e2e1",
+              "tertiary": "#785b09",
+              "on-tertiary-fixed": "#4b3700",
+              "on-primary-fixed-variant": "#5c5b5b",
+              "inverse-on-surface": "#9d9d9b",
+              "tertiary-fixed-dim": "#efc76f",
+              "surface-variant": "#e0e3e0",
+              "outline": "#777c79",
+              "on-tertiary": "#fff8f0",
+              "on-error-container": "#752121",
+              "secondary-fixed-dim": "#d1d5da",
+              "on-secondary-fixed-variant": "#585c61",
+              "tertiary-container": "#fed57b",
+              "secondary": "#5b5f64",
+              "error-container": "#fe8983",
+              "on-primary-fixed": "#403f3f"
+            },
+            fontFamily: {
+              "headline": ["Newsreader", "serif"],
+              "body": ["Inter", "sans-serif"],
+              "label": ["Inter", "sans-serif"],
+              "mono": ["JetBrains Mono", "monospace"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            font-size: 1.25rem;
+        }
+        .mono-text { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+        .label-micro { font-family: 'Inter', sans-serif; font-size: 0.6875rem; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 600; }
+        .ruled-divider { border-bottom: 1px solid rgba(175, 179, 176, 0.2); }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #afb3b0; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/20">
+<!-- SideNavBar (Execution from JSON) -->
+<aside class="fixed inset-y-0 left-0 z-50 flex flex-col py-6 px-4 bg-[#f3f4f1] dark:bg-stone-900 h-screen w-64 border-r border-[#afb3b0]/15">
+<div class="mb-10 px-2">
+<h1 class="text-xl font-serif italic text-[#5f5e5e] dark:text-stone-200">Forensic Ledger</h1>
+<p class="label-micro text-[#5f5e5e]/60 mt-1">QA Command Center</p>
+</div>
+<nav class="flex-1 space-y-2">
+<!-- Draft -->
+<a class="flex items-center gap-3 px-3 py-2 text-[#5f5e5e]/60 dark:text-stone-500 font-medium hover:bg-[#afb3b0]/10 transition-colors group" href="#">
+<span class="material-symbols-outlined">edit_note</span>
+<span class="text-sm">Draft</span>
+</a>
+<!-- Monitor (ACTIVE) -->
+<a class="flex items-center gap-3 px-3 py-2 text-[#5f5e5e] dark:text-white font-bold border-r-2 border-[#5f5e5e] hover:bg-[#afb3b0]/10 transition-colors group" href="#">
+<span class="material-symbols-outlined">visibility</span>
+<span class="text-sm">Monitor</span>
+</a>
+<!-- Review -->
+<a class="flex items-center gap-3 px-3 py-2 text-[#5f5e5e]/60 dark:text-stone-500 font-medium hover:bg-[#afb3b0]/10 transition-colors group" href="#">
+<span class="material-symbols-outlined">verified</span>
+<span class="text-sm">Review</span>
+</a>
+</nav>
+<div class="mt-auto space-y-4">
+<button class="w-full bg-primary text-on-primary py-2.5 px-4 text-sm font-medium rounded-sm flex items-center justify-center gap-2 hover:bg-primary-dim transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-sm">add</span>
+                New Mission
+            </button>
+<div class="pt-4 border-t border-[#afb3b0]/15 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-[#5f5e5e]/60 dark:text-stone-500 text-sm hover:bg-[#afb3b0]/10 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+                    Settings
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#5f5e5e]/60 dark:text-stone-500 text-sm hover:bg-[#afb3b0]/10 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">inventory_2</span>
+                    Archives
+                </a>
+</div>
+<div class="flex items-center gap-3 px-2 pt-2">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden border border-outline-variant/20">
+<img alt="Operator Profile" class="w-full h-full object-cover" data-alt="Close-up professional portrait of a senior systems analyst with neutral lighting and sharp focus" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5to4yIWlxn6yATBXRzKKPqdSozbRz0m3th2sWIHnCQpy56cBqTC06PhYgivc52413e6L5jYPWIq0Wi6yym1CdK6y864qSvlhZnsBJA0wbz5nw_dnZklbxjPIv50F4khJbjP590rvToY2kMa6QRMHAWPfG7Qz_6bcVrSuQFzt1KyaE5f9TkRYjz_01hTkQxB7okTtzm1JcAo-3M9HVpGSBVrswKCPSl6TI4fmSr6enwHYf28e58_PhnzODH4pZcDjrrVKAM05Ib5s"/>
+</div>
+<div class="flex flex-col">
+<span class="text-xs font-bold">Op. Sterling</span>
+<span class="label-micro opacity-60">Lead Forensic</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="ml-64 min-h-screen">
+<!-- TopAppBar (Execution from JSON) -->
+<header class="fixed top-0 right-0 left-64 flex justify-between items-center px-8 z-40 bg-[#faf9f7] dark:bg-stone-950 h-16 border-b border-[#afb3b0]/15">
+<div class="flex items-center gap-4">
+<h2 class="font-headline text-xl text-[#5f5e5e] dark:text-stone-300">Mission Control</h2>
+<div class="h-4 w-[1px] bg-outline-variant/30"></div>
+<div class="flex items-center gap-2 px-2 py-1 bg-surface-container-low rounded-sm">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+</span>
+<span class="label-micro text-on-surface-variant">Live Uplink Active</span>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative">
+<input class="bg-surface-container-low border-none focus:ring-1 focus:ring-primary w-64 text-sm px-4 py-1.5 rounded-sm placeholder:text-[#5f5e5e]/40" placeholder="Trace Run ID or Keyword..." type="text"/>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">search</span>
+</div>
+<div class="flex items-center gap-4 text-[#5f5e5e] dark:text-stone-300">
+<button class="hover:text-black dark:hover:text-white transition-colors"><span class="material-symbols-outlined">notifications</span></button>
+<button class="hover:text-black dark:hover:text-white transition-colors"><span class="material-symbols-outlined">terminal</span></button>
+<button class="hover:text-black dark:hover:text-white transition-colors"><span class="material-symbols-outlined">help_outline</span></button>
+</div>
+</div>
+</header>
+<!-- Content Area -->
+<div class="pt-24 px-8 pb-12 max-w-7xl mx-auto">
+<!-- Summary Stats Row -->
+<section class="grid grid-cols-4 gap-6 mb-10">
+<div class="bg-surface-container-low p-5 border-l-2 border-primary">
+<span class="label-micro text-on-surface-variant mb-1 block">Active Missions</span>
+<div class="flex items-baseline justify-between">
+<span class="text-3xl font-headline font-bold">04</span>
+<span class="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded-sm">Priority Alpha</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-5 border-l-2 border-tertiary">
+<span class="label-micro text-on-surface-variant mb-1 block">In Queue</span>
+<div class="flex items-baseline justify-between">
+<span class="text-3xl font-headline font-bold">12</span>
+<span class="text-xs text-tertiary bg-tertiary/10 px-1.5 py-0.5 rounded-sm">Avg Wait: 4m</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-5 border-l-2 border-outline-variant">
+<span class="label-micro text-on-surface-variant mb-1 block">Drafting</span>
+<div class="flex items-baseline justify-between">
+<span class="text-3xl font-headline font-bold">07</span>
+<span class="text-xs text-on-surface-variant bg-surface-container-high px-1.5 py-0.5 rounded-sm">3 Pending QA</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-5 border-l-2 border-emerald-600">
+<span class="label-micro text-on-surface-variant mb-1 block">Completed (24h)</span>
+<div class="flex items-baseline justify-between">
+<span class="text-3xl font-headline font-bold">142</span>
+<span class="text-xs text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-sm">98.2% Success</span>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-12 gap-8 items-start">
+<!-- Run List (Table-based density) -->
+<div class="col-span-12 lg:col-span-5 space-y-6">
+<div class="flex items-center justify-between mb-2">
+<h3 class="font-headline text-2xl font-bold italic">Operational Stream</h3>
+<div class="flex gap-2">
+<button class="p-1 hover:bg-surface-container-high rounded-sm text-primary"><span class="material-symbols-outlined text-[20px]">filter_list</span></button>
+<button class="p-1 hover:bg-surface-container-high rounded-sm text-primary"><span class="material-symbols-outlined text-[20px]">sort</span></button>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant/15 overflow-hidden">
+<!-- Run Item 1: Active -->
+<div class="p-4 ruled-divider bg-primary/5 border-l-[3px] border-primary flex flex-col gap-3 cursor-pointer">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-bold text-sm tracking-tight">MISSION_BETA_772</h4>
+<p class="label-micro text-primary mt-0.5">Core Checkout Flow / Staging</p>
+</div>
+<span class="label-micro bg-primary text-on-primary px-2 py-0.5 rounded-sm">Running</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex-1 bg-surface-container-high h-1 overflow-hidden">
+<div class="bg-primary h-full w-[65%]"></div>
+</div>
+<span class="mono-text font-bold">65%</span>
+</div>
+<div class="flex justify-between items-center text-[11px] opacity-70 italic">
+<span>Op: System_Auto</span>
+<span>Elapsed: 03:42</span>
+</div>
+</div>
+<!-- Run Item 2: Active -->
+<div class="p-4 ruled-divider hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-bold text-sm tracking-tight">LEDGER_X_AUTH_01</h4>
+<p class="label-micro text-on-surface-variant mt-0.5">Biometric Handshake / Prod-Ref</p>
+</div>
+<span class="label-micro bg-primary text-on-primary px-2 py-0.5 rounded-sm">Running</span>
+</div>
+<div class="flex items-center gap-4 mt-3">
+<div class="flex-1 bg-surface-container-high h-1 overflow-hidden">
+<div class="bg-primary h-full w-[12%]"></div>
+</div>
+<span class="mono-text font-bold">12%</span>
+</div>
+</div>
+<!-- Run Item 3: Failed -->
+<div class="p-4 ruled-divider hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-bold text-sm tracking-tight text-on-surface/50">SMOKE_TEST_UK_009</h4>
+<p class="label-micro text-on-surface-variant/50 mt-0.5">Local Localization / Edge</p>
+</div>
+<span class="label-micro bg-error text-on-error px-2 py-0.5 rounded-sm">Failed</span>
+</div>
+<div class="flex justify-between items-center mt-3">
+<span class="text-xs text-error font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">warning</span> 
+                                    ElementNotFound: .btn-submit
+                                </span>
+<span class="mono-text opacity-50 italic">2m ago</span>
+</div>
+</div>
+<!-- Run Item 4: Queued -->
+<div class="p-4 ruled-divider hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-bold text-sm tracking-tight text-on-surface/70">ARCHIVE_CLEAN_UP</h4>
+<p class="label-micro text-on-surface-variant/70 mt-0.5">Database Sanitization / Batch</p>
+</div>
+<span class="label-micro bg-tertiary text-on-tertiary-fixed px-2 py-0.5 rounded-sm">Queued</span>
+</div>
+<div class="mt-3 flex gap-2">
+<div class="px-1.5 py-0.5 bg-surface-container-high text-[10px] label-micro">Wait: 12m</div>
+<div class="px-1.5 py-0.5 bg-surface-container-high text-[10px] label-micro">Worker: Node-04</div>
+</div>
+</div>
+<!-- Run Item 5: Completed -->
+<div class="p-4 hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-bold text-sm tracking-tight text-on-surface/50">ONBOARDING_FLOW_VAL</h4>
+<p class="label-micro text-on-surface-variant/50 mt-0.5">UX Verification / Stage</p>
+</div>
+<span class="label-micro bg-emerald-600 text-white px-2 py-0.5 rounded-sm">Completed</span>
+</div>
+<div class="mt-3 flex items-center justify-between">
+<span class="text-xs text-emerald-700 italic">42/42 Scenarios Passed</span>
+<span class="mono-text opacity-50 italic">15m ago</span>
+</div>
+</div>
+</div>
+<button class="w-full py-2 text-xs font-bold text-primary hover:bg-primary/5 transition-colors border border-primary/20">
+                        View Full History Log
+                    </button>
+</div>
+<!-- Run Detail View (Asymmetric Focus) -->
+<div class="col-span-12 lg:col-span-7 sticky top-24">
+<div class="bg-surface-container-lowest border border-outline-variant/15 p-6 shadow-sm">
+<div class="flex justify-between items-start mb-8">
+<div class="flex gap-4">
+<div class="w-12 h-12 bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-3xl">terminal</span>
+</div>
+<div>
+<h3 class="text-2xl font-headline font-bold">MISSION_BETA_772</h3>
+<p class="text-sm text-on-surface-variant flex items-center gap-2">
+<span class="label-micro bg-surface-container-high px-1.5">v2.4.0-stable</span>
+<span>Launched by CI/CD Trigger</span>
+</p>
+</div>
+</div>
+<button class="px-4 py-2 bg-error text-on-error font-bold text-xs hover:bg-error/90 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">stop_circle</span>
+                                Terminate Run
+                            </button>
+</div>
+<!-- Run Health Metrics -->
+<div class="grid grid-cols-3 gap-0 border border-outline-variant/20 mb-8">
+<div class="p-4 border-r border-outline-variant/20">
+<span class="label-micro text-on-surface-variant block mb-1">Current Phase</span>
+<span class="font-bold text-sm">Execution &amp; Assertion</span>
+</div>
+<div class="p-4 border-r border-outline-variant/20">
+<span class="label-micro text-on-surface-variant block mb-1">Elapsed Time</span>
+<span class="font-bold text-sm mono-text">00:03:42.12</span>
+</div>
+<div class="p-4 bg-emerald-50/50">
+<span class="label-micro text-emerald-800 block mb-1">Passed Scenarios</span>
+<span class="font-bold text-sm text-emerald-700">18 / 24</span>
+</div>
+</div>
+<!-- Execution Context -->
+<div class="space-y-4 mb-8">
+<div class="flex items-center justify-between border-b border-outline-variant/10 pb-2">
+<span class="label-micro text-on-surface-variant">Step Activity</span>
+<span class="label-micro text-primary">Live</span>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-primary mt-1">input</span>
+<div>
+<p class="text-sm font-medium">Entering secure credit card tokenization field...</p>
+<p class="text-[11px] text-on-surface-variant italic font-serif">Scenario: P0_CHECKOUT_GUEST_USER_CREDIT_CARD</p>
+</div>
+</div>
+</div>
+<!-- Live Console Panel -->
+<div class="mb-8">
+<div class="flex items-center justify-between mb-2">
+<span class="label-micro text-on-surface-variant">Live Evidence Console</span>
+<span class="text-[10px] text-on-surface-variant opacity-50">Log Level: Trace</span>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant/30 p-4 h-48 overflow-y-auto custom-scrollbar mono-text leading-relaxed text-[#5f5e5e]/80 bg-[radial-gradient(#afb3b0_1px,transparent_1px)] [background-size:20px_20px] [background-position:0_0]">
+<div class="mb-1"><span class="text-on-surface-variant opacity-50">[09:41:02]</span> <span class="text-emerald-600">INFO</span> Initializing Chrome Headless Environment...</div>
+<div class="mb-1"><span class="text-on-surface-variant opacity-50">[09:41:05]</span> <span class="text-emerald-600">INFO</span> Navigation to https://staging.ledger.com/checkout success.</div>
+<div class="mb-1"><span class="text-on-surface-variant opacity-50">[09:41:08]</span> <span class="text-emerald-600">INFO</span> DOM hydrated. Found 12 actionable selectors.</div>
+<div class="mb-1 text-tertiary"><span class="text-on-surface-variant opacity-50">[09:42:15]</span> <span class="font-bold">WARN</span> Slow response detected from /api/v1/tax-calc (840ms).</div>
+<div class="mb-1"><span class="text-on-surface-variant opacity-50">[09:43:01]</span> <span class="text-emerald-600">INFO</span> Scenario: Guest checkout initiated.</div>
+<div class="mb-1"><span class="text-on-surface-variant opacity-50">[09:44:22]</span> <span class="text-primary font-bold">TRACE</span> Locating element: iframe#stripe-card-element</div>
+<div class="mb-1"><span class="text-on-surface-variant opacity-50">[09:44:23]</span> <span class="text-primary font-bold">TRACE</span> Switching focus to shadow-root element...</div>
+<div class="animate-pulse inline-block w-1.5 h-3 bg-primary ml-1 align-middle"></div>
+</div>
+</div>
+<!-- Warnings & Evidence -->
+<div>
+<span class="label-micro text-error mb-2 block">Execution Anomalies (02)</span>
+<div class="space-y-2">
+<div class="flex items-start gap-3 p-3 bg-error/5 border border-error/10">
+<span class="material-symbols-outlined text-error text-[18px]">report_problem</span>
+<div class="text-xs">
+<p class="font-bold text-error">Latency Spike</p>
+<p class="text-on-surface-variant mt-0.5">Asset 'hero_background.webp' took 1.2s to load from CDN edge.</p>
+</div>
+</div>
+<div class="flex items-start gap-3 p-3 bg-surface-container-high border border-outline-variant/20 opacity-60">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">visibility_off</span>
+<div class="text-xs">
+<p class="font-bold">Visual Mismatch (Dismissed)</p>
+<p class="text-on-surface-variant mt-0.5">Logo alignment shifted by 1px on viewport 375w. Auto-ignored by policy.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footnote / System Info -->
+<div class="mt-4 flex justify-between items-center px-2">
+<div class="flex gap-4">
+<div class="flex items-center gap-1.5 opacity-50">
+<span class="material-symbols-outlined text-xs">database</span>
+<span class="label-micro text-[9px]">Cluster: EU-WEST-1A</span>
+</div>
+<div class="flex items-center gap-1.5 opacity-50">
+<span class="material-symbols-outlined text-xs">memory</span>
+<span class="label-micro text-[9px]">Engine: Chromium 114.0</span>
+</div>
+</div>
+<span class="label-micro text-[9px] opacity-40 italic">Signature: 8f9a-e24c-11ed-b5ea-0242ac120002</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Background texture simulation (Paper effect) -->
+<div class="fixed inset-0 pointer-events-none opacity-[0.03] z-[-1] bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')]"></div>
+</body></html>

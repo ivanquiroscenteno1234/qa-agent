@@ -1,0 +1,106 @@
+import Link from "next/link";
+
+import { AppShell } from "@/components/layout/app-shell";
+import { CredentialVaultCard } from "@/components/settings/credential-vault-card";
+import { EnvironmentCard } from "@/components/settings/environment-card";
+import { ActionBar } from "@/components/ui/action-bar";
+import { MetricCard } from "@/components/ui/metric-card";
+import { PageHeader } from "@/components/ui/page-header";
+import { SectionFrame } from "@/components/ui/section-frame";
+import { buildCredentialVaultCards, buildEnvironmentCards } from "@/lib/qa/settings-view-model";
+import { listRuns, listScenarioLibraries } from "@/lib/qa/store";
+
+interface SettingsScreenProps {
+  storeBackendLabel?: string;
+}
+
+export async function SettingsScreen({ storeBackendLabel = "json" }: SettingsScreenProps) {
+  const [runs, libraries] = await Promise.all([listRuns(), listScenarioLibraries()]);
+  const credentialCards = buildCredentialVaultCards(runs);
+  const environmentCards = buildEnvironmentCards(runs, libraries);
+  const inlineCredentialRunCount = runs.filter((run) => Boolean(run.plan.loginEmail || run.plan.loginPassword)).length;
+
+  return (
+    <AppShell
+      navItems={[
+        { id: "draft", label: "Draft", eyebrow: "Command Center", href: "/draft" },
+        { id: "monitor", label: "Monitor", eyebrow: "Command Center", href: "/monitor" },
+        { id: "review", label: "Review", eyebrow: "Command Center", href: "/review" }
+      ]}
+      utilityNavItems={[
+        { id: "library", label: "Library", eyebrow: `${libraries.length} saved`, href: "/library" },
+        { id: "settings", label: "Settings", eyebrow: "Local posture", active: true, href: "/settings" },
+        { id: "archives", label: "Archives", eyebrow: "Later", disabled: true }
+      ]}
+      primaryAction={{
+        label: "Open Draft",
+        href: "/draft"
+      }}
+      profile={
+        <>
+          <strong>Operations Profile</strong>
+          <span className="muted">Local-file mode</span>
+        </>
+      }
+      topBarTitle="System Configuration"
+      topBarBadge="Honest Mode"
+      searchPlaceholder="Search environments, references, or posture notes"
+      topBarUtilities={
+        <>
+          <span className="app-utility-chip">No vault backend</span>
+          <span className="app-utility-chip">Store: {storeBackendLabel.toUpperCase()}</span>
+        </>
+      }
+    >
+      <PageHeader
+        eyebrow="System Configuration & Settings"
+        title="Settings"
+        description="Operational posture for the current MVP: what the agent stores locally, which execution environments appear in saved activity, and where credential handling remains intentionally limited."
+        actions={
+          <ActionBar>
+            <Link className="side-nav-primary-action" href="/library">
+              Review Libraries
+            </Link>
+            <button type="button" disabled>
+              Export Settings
+            </button>
+          </ActionBar>
+        }
+      />
+
+      <section className="metric-grid">
+        <MetricCard label="Run Records" value={String(runs.length)} detail={`Stored in ${storeBackendLabel.toUpperCase()} run store`} tone="running" />
+        <MetricCard label="Scenario Libraries" value={String(libraries.length)} detail={`Stored in ${storeBackendLabel.toUpperCase()} library store`} />
+        <MetricCard label="Credential References" value={String(credentialCards.length)} detail="Observed from saved plans, not from a vault index" tone="warning" />
+        <MetricCard label="Inline Secret Risk" value={String(inlineCredentialRunCount)} detail="Runs with direct email or password plan input" tone={inlineCredentialRunCount ? "warning" : "success"} />
+      </section>
+
+      <SectionFrame eyebrow="Credential Handling" title="Credential Posture" reference={`${credentialCards.length} observed profiles`}>
+        <div className="settings-grid">
+          {credentialCards.length ? (
+            credentialCards.map((credential) => <CredentialVaultCard key={credential.id} credential={credential} />)
+          ) : (
+            <p className="muted">No credential references have been observed in saved runs yet.</p>
+          )}
+        </div>
+      </SectionFrame>
+
+      <SectionFrame eyebrow="Environment Inventory" title="Execution Environments" reference={`${environmentCards.length} observed environments`}>
+        <div className="settings-grid">
+          {environmentCards.map((environment) => (
+            <EnvironmentCard key={environment.id} environment={environment} />
+          ))}
+        </div>
+      </SectionFrame>
+
+      <SectionFrame eyebrow="Behavior Constraints" title="What This Screen Does Not Claim">
+        <ul>
+          <li>Credential cards reflect observed plan usage in local files. They do not represent a real secret manager.</li>
+          <li>Environment health is inferred from saved runs and libraries. There is no live uptime or latency telemetry yet.</li>
+          <li>Rotate, revoke, probe, edit, and export actions remain disabled until corresponding backend capabilities exist.</li>
+          <li>Draft remains the only place where operators can currently change execution inputs.</li>
+        </ul>
+      </SectionFrame>
+    </AppShell>
+  );
+}

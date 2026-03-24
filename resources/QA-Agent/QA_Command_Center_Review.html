@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Forensic Ledger - Mission Control Review</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,700;1,6..72,400&amp;display=swap" rel="stylesheet"/>
+<!-- Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "error": "#9f403d",
+                        "primary-fixed": "#e5e2e1",
+                        "on-surface-variant": "#5c605d",
+                        "secondary-container": "#dfe3e8",
+                        "surface-container": "#edeeeb",
+                        "on-error": "#fff7f6",
+                        "on-primary-container": "#525151",
+                        "on-secondary-container": "#4e5257",
+                        "surface-tint": "#5f5e5e",
+                        "secondary-fixed": "#dfe3e8",
+                        "on-primary": "#faf7f6",
+                        "tertiary-dim": "#6a4f00",
+                        "primary-dim": "#535252",
+                        "on-secondary": "#f6f9ff",
+                        "surface": "#faf9f7",
+                        "on-tertiary-container": "#624900",
+                        "surface-container-highest": "#e0e3e0",
+                        "background": "#faf9f7",
+                        "surface-dim": "#d6dbd7",
+                        "primary-fixed-dim": "#d6d4d3",
+                        "on-secondary-fixed": "#3c4044",
+                        "on-tertiary-fixed-variant": "#6e5200",
+                        "tertiary-fixed": "#fed57b",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f3f4f1",
+                        "on-surface": "#2f3331",
+                        "outline-variant": "#afb3b0",
+                        "error-dim": "#4e0309",
+                        "inverse-surface": "#0d0e0e",
+                        "primary": "#5f5e5e",
+                        "surface-container-high": "#e6e9e6",
+                        "surface-bright": "#faf9f7",
+                        "inverse-primary": "#ffffff",
+                        "on-background": "#2f3331",
+                        "secondary-dim": "#4f5358",
+                        "primary-container": "#e5e2e1",
+                        "tertiary": "#785b09",
+                        "on-tertiary-fixed": "#4b3700",
+                        "on-primary-fixed-variant": "#5c5b5b",
+                        "inverse-on-surface": "#9d9d9b",
+                        "tertiary-fixed-dim": "#efc76f",
+                        "surface-variant": "#e0e3e0",
+                        "outline": "#777c79",
+                        "on-tertiary": "#fff8f0",
+                        "on-error-container": "#752121",
+                        "secondary-fixed-dim": "#d1d5da",
+                        "on-secondary-fixed-variant": "#585c61",
+                        "tertiary-container": "#fed57b",
+                        "secondary": "#5b5f64",
+                        "error-container": "#fe8983",
+                        "on-primary-fixed": "#403f3f"
+                    },
+                    fontFamily: {
+                        "headline": ["Newsreader", "serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #faf9f7;
+            color: #2f3331;
+        }
+        .serif-italic { font-family: 'Newsreader', serif; font-style: italic; }
+        .micro-label { font-size: 0.6875rem; letter-spacing: 0.05em; font-weight: 600; }
+        .ruled-line { height: 1px; background-color: rgba(175, 179, 176, 0.2); }
+        .vertical-ruled { width: 1px; background-color: rgba(175, 179, 176, 0.2); }
+    </style>
+</head>
+<body class="bg-surface text-on-surface overflow-x-hidden">
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed inset-y-0 left-0 z-50 flex flex-col py-6 px-4 h-screen w-64 border-r border-[#afb3b0]/15 bg-[#f3f4f1] dark:bg-stone-900">
+<div class="mb-10 px-2">
+<h1 class="text-xl font-serif italic text-[#5f5e5e] dark:text-stone-200">Forensic Ledger</h1>
+<p class="micro-label text-[#5f5e5e]/60 uppercase mt-1">QA Command Center</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-sm transition-colors hover:bg-[#afb3b0]/10 text-[#5f5e5e]/60 dark:text-stone-500 font-medium" href="#">
+<span class="material-symbols-outlined" data-icon="edit_note">edit_note</span>
+<span class="text-[11px] uppercase tracking-wider font-label">Draft</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-sm transition-colors hover:bg-[#afb3b0]/10 text-[#5f5e5e]/60 dark:text-stone-500 font-medium" href="#">
+<span class="material-symbols-outlined" data-icon="visibility">visibility</span>
+<span class="text-[11px] uppercase tracking-wider font-label">Monitor</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-sm transition-colors hover:bg-[#afb3b0]/10 text-[#5f5e5e] dark:text-white font-bold border-r-2 border-[#5f5e5e]" href="#">
+<span class="material-symbols-outlined" data-icon="verified">verified</span>
+<span class="text-[11px] uppercase tracking-wider font-label">Review</span>
+</a>
+</nav>
+<div class="mt-auto space-y-1">
+<button class="w-full mb-6 bg-primary text-on-primary py-2.5 px-4 text-[11px] uppercase tracking-widest font-bold rounded-sm hover:opacity-90 active:scale-[0.98] transition-all">
+                New Mission
+            </button>
+<a class="flex items-center gap-3 px-3 py-2 rounded-sm transition-colors hover:bg-[#afb3b0]/10 text-[#5f5e5e]/60" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-[11px] uppercase tracking-wider font-label">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-sm transition-colors hover:bg-[#afb3b0]/10 text-[#5f5e5e]/60" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="text-[11px] uppercase tracking-wider font-label">Archives</span>
+</a>
+<div class="mt-6 flex items-center gap-3 px-2">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden">
+<img alt="Operator Profile" class="w-full h-full object-cover" data-alt="Close-up portrait of a professional male systems operator in sharp lighting with neutral background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbWHK5cbYW7Ixr9MtJN4tdZyWxwkyBIEaUptlr3uz9TtKvyKNdZRcHe-MP6xD79gr1IVXTLe2prKiSQ8z85iJvezy8ZrIdM4m-F-xYFFr9_iCRJehtYJZo8_xScRB_hY8gxdtqV_qBb9ipHDmlTA7dAeVL_NfvdHeq2mB3oIw1fbV_skD4O4MCaF1BFjbocP77x5raXWfGHHPn5l0gMu9oX095YNNyxgTnTJdqXwo8Gh_i2Fu5DFkjCiieRffVwI8AloWwu7R04Zw"/>
+</div>
+<div>
+<p class="text-[10px] font-bold text-primary leading-tight">OP-742</p>
+<p class="text-[9px] text-outline">LEVEL 4 CLEARANCE</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TopAppBar (Shared Component) -->
+<header class="fixed top-0 right-0 left-64 flex justify-between items-center px-8 z-40 h-16 border-b border-[#afb3b0]/15 bg-[#faf9f7] dark:bg-stone-950">
+<div class="flex items-center gap-4">
+<h2 class="font-headline text-2xl font-bold tracking-tight text-primary-dim italic">Mission Control</h2>
+<div class="h-4 w-[1px] bg-outline-variant/30"></div>
+<span class="micro-label bg-tertiary-container text-on-tertiary-container px-2 py-0.5">RUN #882-QA</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative group">
+<input class="bg-surface-container-low border-none focus:ring-1 focus:ring-primary text-xs py-1.5 pl-8 pr-4 w-64 rounded-sm transition-all" placeholder="Search Evidence..." type="text"/>
+<span class="material-symbols-outlined absolute left-2 top-1.5 text-outline text-sm" data-icon="search">search</span>
+</div>
+<div class="flex items-center gap-3 text-primary/70">
+<button class="hover:text-black transition-colors"><span class="material-symbols-outlined" data-icon="notifications">notifications</span></button>
+<button class="hover:text-black transition-colors"><span class="material-symbols-outlined" data-icon="terminal">terminal</span></button>
+<button class="hover:text-black transition-colors"><span class="material-symbols-outlined" data-icon="help_outline">help_outline</span></button>
+</div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="ml-64 mt-16 p-8 min-h-screen">
+<!-- Header: Product Summary -->
+<section class="grid grid-cols-12 gap-6 mb-12">
+<div class="col-span-8">
+<p class="micro-label text-outline uppercase mb-2">Subject Summary</p>
+<h3 class="font-headline text-4xl font-bold mb-4">Regression Suite: Alpha Protocol 2.4</h3>
+<p class="font-body text-on-surface-variant max-w-2xl text-sm leading-relaxed">
+                    Automated sweep of critical financial transaction hooks and ledger integrity checks. 
+                    Baseline established 48h prior (v2.3.9). All visual deltas recorded and cataloged below for manual adjudication.
+                </p>
+</div>
+<div class="col-span-4 flex flex-col justify-end items-end gap-2">
+<div class="flex gap-4">
+<div class="text-right">
+<p class="micro-label text-outline">STATUS</p>
+<p class="font-bold text-error uppercase tracking-tighter">Review Required</p>
+</div>
+<div class="text-right">
+<p class="micro-label text-outline">DURATION</p>
+<p class="font-bold">14m 22s</p>
+</div>
+</div>
+<div class="flex gap-2 mt-4">
+<button class="bg-surface-container-high px-4 py-2 text-[11px] font-bold uppercase tracking-wider hover:bg-surface-container-highest transition-colors">Update Linked Library</button>
+<button class="bg-primary text-on-primary px-4 py-2 text-[11px] font-bold uppercase tracking-wider hover:opacity-90 transition-all">Save Run As Library</button>
+</div>
+</div>
+</section>
+<!-- Run-to-Run Comparison Panel (Bento Style) -->
+<section class="grid grid-cols-4 gap-1 mb-12 bg-outline-variant/10 p-1">
+<!-- Scenarios -->
+<div class="bg-surface-container-lowest p-6 border border-outline-variant/5">
+<div class="flex justify-between items-start mb-6">
+<p class="micro-label text-outline">SCENARIOS</p>
+<span class="material-symbols-outlined text-outline" data-icon="account_tree">account_tree</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold">142</span>
+<span class="text-xs text-error font-bold flex items-center"><span class="material-symbols-outlined text-xs" data-icon="arrow_upward">arrow_upward</span> 12%</span>
+</div>
+<p class="text-[10px] text-outline-variant mt-1">vs Baseline (127)</p>
+</div>
+<!-- Defects -->
+<div class="bg-surface-container-lowest p-6 border border-outline-variant/5">
+<div class="flex justify-between items-start mb-6">
+<p class="micro-label text-outline">POTENTIAL DEFECTS</p>
+<span class="material-symbols-outlined text-error" data-icon="bug_report">bug_report</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold">04</span>
+<span class="text-xs text-error font-bold flex items-center"><span class="material-symbols-outlined text-xs" data-icon="warning">warning</span> +2</span>
+</div>
+<p class="text-[10px] text-outline-variant mt-1">New visual regressions detected</p>
+</div>
+<!-- Artifacts -->
+<div class="bg-surface-container-lowest p-6 border border-outline-variant/5">
+<div class="flex justify-between items-start mb-6">
+<p class="micro-label text-outline">ARTIFACTS</p>
+<span class="material-symbols-outlined text-outline" data-icon="folder_zip">folder_zip</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold">1,024</span>
+<span class="text-xs text-tertiary font-bold flex items-center"><span class="material-symbols-outlined text-xs" data-icon="stable_box">box</span> STABLE</span>
+</div>
+<p class="text-[10px] text-outline-variant mt-1">Images, Logs, and Traces</p>
+</div>
+<!-- Timeline -->
+<div class="bg-surface-container-lowest p-6 border border-outline-variant/5">
+<div class="flex justify-between items-start mb-6">
+<p class="micro-label text-outline">TIMELINE SIZE</p>
+<span class="material-symbols-outlined text-outline" data-icon="history_toggle_off">history_toggle_off</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold">1.2<span class="text-sm">GB</span></span>
+<span class="text-xs text-primary font-bold flex items-center"><span class="material-symbols-outlined text-xs" data-icon="arrow_downward">arrow_downward</span> 4%</span>
+</div>
+<p class="text-[10px] text-outline-variant mt-1">Optimized capture sequence</p>
+</div>
+</section>
+<!-- Main Content Area: Asymmetric Layout -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Left: Step Timeline & Analysis (Col 1-8) -->
+<div class="col-span-8 space-y-12">
+<div>
+<div class="flex items-center gap-4 mb-6">
+<h4 class="font-headline text-2xl font-bold italic">Step Timeline</h4>
+<div class="flex-1 ruled-line"></div>
+</div>
+<div class="space-y-6">
+<!-- Timeline Item 1 -->
+<div class="flex gap-6">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center font-bold text-xs">01</div>
+<div class="w-[2px] flex-1 bg-outline-variant/20 my-2"></div>
+</div>
+<div class="flex-1 bg-surface-container-lowest p-4 border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<div>
+<p class="micro-label text-outline">ACTION: NAVIGATION</p>
+<h5 class="font-bold text-sm">Auth Gateway Redirect</h5>
+</div>
+<div class="flex gap-2">
+<span class="micro-label bg-surface-container px-2 py-0.5 rounded-full">VIEW</span>
+<span class="micro-label bg-surface-container px-2 py-0.5 rounded-full">SURFACE</span>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-3">
+<div class="aspect-video bg-surface-container-low overflow-hidden group relative">
+<img alt="Dashboard data screenshot" class="w-full h-full object-cover" data-alt="Screenshot of a complex financial dashboard with charts and tables in a clean web interface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAtd90ywTTKHnPXBmjHaye4yjtKl1VbBpx6yptARJQk1VYle7Ji_wr9CdIp7q0-kEH0OUKR7yFKonAfWBFc6DJMKIG_OpwPhcALrpqxxURM0pGA4g8BpZyqOXZFmzevGcVDuhZVKB1jQMM7gHdVAmPSTDsDBKR2lVUSFOLdGip-J3CSHdaorZpl5Yjo4vaw3Vqnr2OZfisnvQLCPr4YD4qSy5LrJpNaRvJvGHeGmj_lugWkgTkL04FaxJ_5UimAP6SnJBKPzvuk_4E"/>
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+<span class="material-symbols-outlined text-white" data-icon="zoom_in">zoom_in</span>
+</div>
+</div>
+<div class="aspect-video bg-surface-container-low border border-dashed border-outline-variant/30 flex items-center justify-center text-outline text-[10px] flex-col gap-1">
+<span class="material-symbols-outlined" data-icon="add_a_photo">add_a_photo</span>
+                                        BASELINE MISSING
+                                    </div>
+<div class="bg-surface-container-low p-3 flex flex-col justify-between">
+<p class="text-[10px] text-on-surface-variant leading-tight">DOM element '#auth-mount' rendered in 420ms. No anomalies detected in tree structure.</p>
+<p class="micro-label text-primary font-bold mt-2">12:04:01:002</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Timeline Item 2 (Defect State) -->
+<div class="flex gap-6">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-error flex items-center justify-center font-bold text-xs text-white">02</div>
+<div class="w-[2px] flex-1 bg-outline-variant/20 my-2"></div>
+</div>
+<div class="flex-1 bg-surface-container-lowest p-4 border-l-4 border-l-error border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<div>
+<p class="micro-label text-error">DEFECT DETECTED</p>
+<h5 class="font-bold text-sm">Input Validation Mismatch</h5>
+</div>
+<div class="flex gap-2">
+<span class="micro-label bg-error-container text-on-error-container px-2 py-0.5 rounded-full">DEFECT</span>
+<span class="micro-label bg-surface-container px-2 py-0.5 rounded-full">INPUT</span>
+</div>
+</div>
+<div class="grid grid-cols-12 gap-4">
+<div class="col-span-8 bg-surface-container-low p-4 rounded-sm">
+<div class="flex gap-4 items-center">
+<div class="flex-1 text-center">
+<p class="text-[9px] uppercase font-bold text-outline">Baseline</p>
+<div class="h-24 bg-white border border-outline-variant/20 mt-2 flex items-center justify-center">
+<span class="text-xs text-outline italic">Success State</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-error" data-icon="compare_arrows">compare_arrows</span>
+<div class="flex-1 text-center">
+<p class="text-[9px] uppercase font-bold text-error">Current</p>
+<div class="h-24 bg-error/5 border border-error/20 mt-2 flex items-center justify-center">
+<span class="text-xs text-error font-bold">Error 500</span>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-4 flex flex-col justify-center">
+<p class="text-[10px] font-bold text-primary uppercase mb-1">Impact Analysis</p>
+<p class="text-[10px] text-on-surface-variant leading-relaxed">Credential injection failed. Possible timeout on the validation hook. High risk for core transaction flow.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- QA Analysis Section -->
+<div class="bg-surface-container-low p-8 border border-outline-variant/10">
+<div class="flex items-center gap-4 mb-8">
+<h4 class="font-headline text-2xl font-bold italic">Forensic Analysis</h4>
+<div class="flex-1 ruled-line"></div>
+</div>
+<div class="grid grid-cols-2 gap-12">
+<div>
+<p class="micro-label text-primary uppercase font-bold mb-4">Risk Summary</p>
+<div class="space-y-4">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-error text-lg" data-icon="warning">warning</span>
+<p class="text-xs leading-relaxed"><span class="font-bold">Regression Path:</span> The fail in Step 02 invalidates all downstream transaction checks for this session.</p>
+</div>
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-tertiary text-lg" data-icon="info">info</span>
+<p class="text-xs leading-relaxed"><span class="font-bold">Library Alignment:</span> Matches 84% of pattern 'Auth-Timeout-A'. Recommend investigating edge node latency.</p>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-4 border border-outline-variant/5">
+<p class="micro-label text-outline uppercase mb-4">Suggested Manual Verifications</p>
+<ul class="space-y-2">
+<li class="flex items-center gap-2 text-[10px]">
+<span class="material-symbols-outlined text-sm" data-icon="check_box_outline_blank">check_box_outline_blank</span>
+                                    Verify Auth Token expiration manually in DevTools
+                                </li>
+<li class="flex items-center gap-2 text-[10px]">
+<span class="material-symbols-outlined text-sm" data-icon="check_box_outline_blank">check_box_outline_blank</span>
+                                    Re-run suite with network throttling (Slow 3G)
+                                </li>
+<li class="flex items-center gap-2 text-[10px]">
+<span class="material-symbols-outlined text-sm" data-icon="check_box_outline_blank">check_box_outline_blank</span>
+                                    Inspect Redis cache state for session #QA-882
+                                </li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<!-- Right: Evidence Workspace (Col 9-12) -->
+<div class="col-span-4 bg-surface-container-low border border-outline-variant/10 flex flex-col">
+<div class="p-6 border-b border-outline-variant/10">
+<h4 class="micro-label text-primary font-bold uppercase flex justify-between items-center">
+                        Evidence Workspace
+                        <span class="material-symbols-outlined text-sm" data-icon="filter_list">filter_list</span>
+</h4>
+</div>
+<div class="flex-1 overflow-y-auto p-6 space-y-8">
+<!-- Evidence Captures -->
+<div>
+<div class="flex justify-between items-center mb-4">
+<p class="micro-label font-bold text-outline">EVIDENCE CAPTURES</p>
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-sm">12</span>
+</div>
+<div class="grid grid-cols-3 gap-2">
+<div class="aspect-square bg-white border border-outline-variant/20 hover:border-primary transition-colors cursor-pointer p-1">
+<img alt="UI detail" class="w-full h-full object-cover" data-alt="Close up view of a data visualization chart on a computer screen in a professional setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCr1odt2kODjtmu5gG_STr-82X3SKBgh9a874rkJO3aw87GFOzDye0AEdsUNldjYdPev19GJGLtY3RZMHyKGhYPMNJrmXTfpbdlaOFVyI8np40W69JwWi-FKP8fLc6oztWR1-kldh-JZ8RL-OejDgy_PV9IIsgep--9zFuO608d19q9DBnIYRtV8Yd4s3Fj58e9dpjap-r_UBn3xccuU6vfDgL9-w-9v2JxWjZvozjSwYGG_hxrwh4Lw19cTmpHHJDdS9jz7u4kmrI"/>
+</div>
+<div class="aspect-square bg-white border border-outline-variant/20 hover:border-primary transition-colors cursor-pointer p-1">
+<img alt="Code snippet" class="w-full h-full object-cover" data-alt="Macro photo of lines of computer code on a dark monitor with blue and purple highlights" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGO3_-qYFBjjj7WhLECE_6N1Iv66yJNceRzNECXV5AuqwJEyqka6OZQpHq9YTwnuheuvGmt6tkDbhTcxNhWL6kN2_uMJkxLh5tEuS1_ROScEGOryiAO02ASaNxUXSS5_CAG00Vk42xeRZjxgrj4mqjV--qC_QVfCAMBiSR4EA7Akf2yGBouqFQCKfBiBjMOe-obBwaBZJkzMyKr6_o5Q_959hDna6OSmWgQFUEGwIffhI5ywyG3pHmFFWJuugNv1RzKFRmBk8-ZUM"/>
+</div>
+<div class="aspect-square bg-white border border-outline-variant/20 hover:border-primary transition-colors cursor-pointer p-1">
+<img alt="Browser view" class="w-full h-full object-cover" data-alt="Clean minimal browser window displaying a web application interface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuATmVdKacZIrB55eZd6UbOONvsVQK6_n1poUeOU02VamNLQ5c3ezzx0-TNEsxUSXS0ESDXRa0nsn100wtOmwfbPMNdc8sXGdS1yI2YqqiULef9Qickl5yHQOPMIA10STV_N6Cj57ZHX6KXjxeTfgnMW8EJbk0yE5VH0ALLBt7iKm7gC7tZuwlsQAdxGdWfPIYAKIkQrXe8fqNJpAi2SBUOujkaC9vC2yy1TvlQXgPH3BsHp6syGhzwr226j_T0R-ijFsl_tPG0DczE"/>
+</div>
+</div>
+</div>
+<!-- Discovery Data -->
+<div>
+<div class="flex justify-between items-center mb-4">
+<p class="micro-label font-bold text-outline">DISCOVERY DATA</p>
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-sm">08</span>
+</div>
+<div class="space-y-1">
+<div class="bg-white p-2 border border-outline-variant/10 text-[10px] flex justify-between group">
+<span class="text-on-surface-variant">payload_manifest.json</span>
+<span class="material-symbols-outlined text-[12px] opacity-0 group-hover:opacity-100 transition-opacity" data-icon="download">download</span>
+</div>
+<div class="bg-white p-2 border border-outline-variant/10 text-[10px] flex justify-between group">
+<span class="text-on-surface-variant">network_waterfall.har</span>
+<span class="material-symbols-outlined text-[12px] opacity-0 group-hover:opacity-100 transition-opacity" data-icon="download">download</span>
+</div>
+<div class="bg-white p-2 border border-outline-variant/10 text-[10px] flex justify-between group">
+<span class="text-on-surface-variant">console_dump.log</span>
+<span class="material-symbols-outlined text-[12px] opacity-0 group-hover:opacity-100 transition-opacity" data-icon="download">download</span>
+</div>
+</div>
+</div>
+<!-- Debug Archives -->
+<div>
+<div class="flex justify-between items-center mb-4">
+<p class="micro-label font-bold text-outline">DEBUG ARCHIVES</p>
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-sm">02</span>
+</div>
+<div class="bg-white border border-outline-variant/20 p-4">
+<div class="flex items-center gap-3 mb-3">
+<span class="material-symbols-outlined text-primary" data-icon="inventory_2">inventory_2</span>
+<div>
+<p class="text-[10px] font-bold">FULL_DUMP_QA_882.zip</p>
+<p class="text-[9px] text-outline">42.5 MB • Timestamp: 14:02:11</p>
+</div>
+</div>
+<button class="w-full py-1.5 border border-primary text-primary text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-white transition-all">Extract for Analysis</button>
+</div>
+</div>
+</div>
+<!-- Bottom Sticky Action (In Sidebar) -->
+<div class="p-6 bg-surface-container-high border-t border-outline-variant/20">
+<p class="micro-label text-on-surface-variant mb-3">ANNOTATION PANEL</p>
+<textarea class="w-full bg-white border-outline-variant/30 text-xs p-2 h-24 focus:ring-primary focus:border-primary resize-none placeholder:italic" placeholder="Enter findings for the final report..."></textarea>
+<button class="w-full mt-3 bg-secondary text-on-secondary py-2 text-[10px] font-bold uppercase tracking-widest">Finalize Forensic Report</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Contextual FAB Suppression: FAB is only for dashboard/home. Hidden here. -->
+</body></html>

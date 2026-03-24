@@ -1,0 +1,1074 @@
+import { mkdirSync, readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+
+import Database from "better-sqlite3";
+
+import type {
+  Artifact,
+  ExecutionWarning,
+  GenerateScenariosResponse,
+  RunEvent,
+  RunPlan,
+  RunRecord,
+  RunStatus,
+  RunSummary,
+  Scenario,
+  ScenarioLibrary
+} from "@/lib/types";
+import { buildScenarioLibraryComparison } from "@/lib/qa/scenario-library";
+import { generateScenarios } from "@/lib/qa/scenario-generator";
+import { parsePlainTextSteps } from "@/lib/qa/step-parser";
+import { readSeedDataFromJsonStoreSync } from "@/lib/qa/storage/json-store";
+import { dataDirectory, sqliteDatabasePath, sqliteMigrationsDirectory } from "@/lib/qa/storage/paths";
+import {
+  buildScenarioLibraryRecord,
+  buildRunSummary,
+  createExecutionWarning,
+  createRunEvent,
+  findExistingScenarioLibraryForCreate,
+  findMatchingScenarioLibrary,
+  isTerminalRunStatus,
+  mergeRunRecord,
+  normalizeRunRecord,
+  normalizeScenarioLibraryRecord,
+  sanitizeRunRecordContent,
+  sortRuns,
+  sortScenarioLibraries
+} from "@/lib/qa/storage/shared";
+import type { QaStoreBackend, RunRecordPatch } from "@/lib/qa/storage/types";
+import { createId } from "@/lib/qa/utils";
+
+type RunRow = { id: string; payload: string };
+type ScenarioLibraryRow = { id: string; payload: string };
+type RunDetailsRow = {
+  run_id: string;
+  started_at: string | null;
+  completed_at: string | null;
+  cancel_requested_at: string | null;
+  current_phase: RunRecord["currentPhase"];
+  current_activity: string | null;
+  current_step_number: number | null;
+  current_scenario_index: number | null;
+  current_scenario_title: string | null;
+  summary: string;
+  feature_area: string;
+  environment: string;
+  target_url: string;
+  mode: RunPlan["mode"];
+  browser: string | null;
+  role: string;
+  scenario_library_id: string | null;
+};
+type RunEventRow = {
+  id: string;
+  timestamp: string;
+  phase: RunEvent["phase"];
+  level: RunEvent["level"];
+  message: string;
+  category: RunEvent["category"];
+  step_number: number | null;
+  scenario_title: string | null;
+};
+type StepResultRow = {
+  step_id: string;
+  step_number: number;
+  user_step_text: string;
+  normalized_action: RunRecord["stepResults"][number]["normalizedAction"];
+  observed_target: string;
+  action_result: string;
+  assertion_result: RunRecord["stepResults"][number]["assertionResult"];
+  notes: string;
+  screenshot_label: string;
+  screenshot_artifact_id: string | null;
+};
+type ScenarioLibraryDetailsRow = {
+  library_id: string;
+  source_run_id: string | null;
+  feature_area: string;
+  environment: string;
+  target_url: string;
+  role: string;
+  created_at: string;
+  version: number;
+  risk_summary_json: string;
+  coverage_gaps_json: string;
+};
+type ScenarioLibraryVersionRow = {
+  version: number;
+  created_at: string;
+  source_run_id: string | null;
+  scenario_count: number;
+  summary: string;
+  change_summary_json: string;
+};
+type ScenarioLibraryScenarioRow = {
+  scenario_id: string;
+  ordinal: number;
+  title: string;
+  priority: Scenario["priority"];
+  type: Scenario["type"];
+  prerequisites_json: string;
+  steps_json: string;
+  expected_result: string;
+  risk_rationale: string;
+  approved_for_automation: number;
+};
+type RunMetricsRow = {
+  run_id: string;
+  parsed_step_count: number;
+  generated_scenario_count: number;
+  step_result_count: number;
+  artifact_count: number;
+  defect_count: number;
+};
+type ArtifactRow = {
+  id: string;
+  type: Artifact["type"];
+  label: string;
+  content: string;
+};
+type RunSummaryRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  status: RunStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  cancel_requested_at: string | null;
+  current_phase: RunRecord["currentPhase"];
+  current_activity: string | null;
+  current_step_number: number | null;
+  current_scenario_index: number | null;
+  current_scenario_title: string | null;
+  summary: string;
+  feature_area: string;
+  environment: string;
+  target_url: string;
+  mode: RunPlan["mode"];
+  browser: string | null;
+  role: string;
+  scenario_library_id: string | null;
+  parsed_step_count: number | null;
+  generated_scenario_count: number | null;
+  step_result_count: number | null;
+  artifact_count: number | null;
+  defect_count: number | null;
+};
+
+let database: Database.Database | null = null;
+
+function readRunDetails(db: Database.Database, runId: string): RunDetailsRow | undefined {
+  return db.prepare(
+    `SELECT
+      run_id,
+      started_at,
+      completed_at,
+      cancel_requested_at,
+      current_phase,
+      current_activity,
+      current_step_number,
+      current_scenario_index,
+      current_scenario_title,
+      summary,
+      feature_area,
+      environment,
+      target_url,
+      mode,
+      browser,
+      role,
+      scenario_library_id
+    FROM run_details
+    WHERE run_id = ?`
+  ).get(runId) as RunDetailsRow | undefined;
+}
+
+function readRunMetrics(db: Database.Database, runId: string): RunMetricsRow | undefined {
+  return db.prepare(
+    `SELECT
+      run_id,
+      parsed_step_count,
+      generated_scenario_count,
+      step_result_count,
+      artifact_count,
+      defect_count
+    FROM run_metrics
+    WHERE run_id = ?`
+  ).get(runId) as RunMetricsRow | undefined;
+}
+
+function readRunEvents(db: Database.Database, runId: string): RunEvent[] {
+  const rows = db.prepare(
+    `SELECT
+      id,
+      timestamp,
+      phase,
+      level,
+      message,
+      category,
+      step_number,
+      scenario_title
+    FROM run_events
+    WHERE run_id = ?
+    ORDER BY timestamp ASC, id ASC`
+  ).all(runId) as RunEventRow[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    timestamp: row.timestamp,
+    phase: row.phase,
+    level: row.level,
+    message: row.message,
+    category: row.category,
+    stepNumber: row.step_number ?? undefined,
+    scenarioTitle: row.scenario_title ?? undefined
+  }));
+}
+
+function readStepResults(db: Database.Database, runId: string): RunRecord["stepResults"] {
+  const rows = db.prepare(
+    `SELECT
+      step_id,
+      step_number,
+      user_step_text,
+      normalized_action,
+      observed_target,
+      action_result,
+      assertion_result,
+      notes,
+      screenshot_label,
+      screenshot_artifact_id
+    FROM step_results
+    WHERE run_id = ?
+    ORDER BY step_number ASC, step_id ASC`
+  ).all(runId) as StepResultRow[];
+
+  return rows.map((row) => ({
+    stepId: row.step_id,
+    stepNumber: row.step_number,
+    userStepText: row.user_step_text,
+    normalizedAction: row.normalized_action,
+    observedTarget: row.observed_target,
+    actionResult: row.action_result,
+    assertionResult: row.assertion_result,
+    notes: row.notes,
+    screenshotLabel: row.screenshot_label,
+    screenshotArtifactId: row.screenshot_artifact_id ?? undefined
+  }));
+}
+
+function readRunArtifacts(db: Database.Database, runId: string): Artifact[] {
+  const rows = db.prepare(
+    `SELECT
+      id,
+      type,
+      label,
+      content
+    FROM run_artifacts
+    WHERE run_id = ?
+    ORDER BY ordinal ASC, id ASC`
+  ).all(runId) as ArtifactRow[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    type: row.type,
+    label: row.label,
+    content: row.content
+  }));
+}
+
+function readRunArtifact(db: Database.Database, runId: string, artifactId: string): Artifact | undefined {
+  const row = db.prepare(
+    `SELECT id, type, label, content
+    FROM run_artifacts
+    WHERE run_id = ? AND id = ?`
+  ).get(runId, artifactId) as ArtifactRow | undefined;
+
+  return row
+    ? {
+        id: row.id,
+        type: row.type,
+        label: row.label,
+        content: row.content
+      }
+    : undefined;
+}
+
+function readScenarioLibraryDetails(db: Database.Database, libraryId: string): ScenarioLibraryDetailsRow | undefined {
+  return db.prepare(
+    `SELECT
+      library_id,
+      source_run_id,
+      feature_area,
+      environment,
+      target_url,
+      role,
+      created_at,
+      version,
+      risk_summary_json,
+      coverage_gaps_json
+    FROM scenario_library_details
+    WHERE library_id = ?`
+  ).get(libraryId) as ScenarioLibraryDetailsRow | undefined;
+}
+
+function readScenarioLibraryVersions(db: Database.Database, libraryId: string): ScenarioLibrary["versions"] {
+  const rows = db.prepare(
+    `SELECT
+      version,
+      created_at,
+      source_run_id,
+      scenario_count,
+      summary,
+      change_summary_json
+    FROM scenario_library_versions
+    WHERE library_id = ?
+    ORDER BY version ASC`
+  ).all(libraryId) as ScenarioLibraryVersionRow[];
+
+  return rows.map((row) => ({
+    version: row.version,
+    createdAt: row.created_at,
+    sourceRunId: row.source_run_id ?? undefined,
+    scenarioCount: row.scenario_count,
+    summary: row.summary,
+    changeSummary: JSON.parse(row.change_summary_json) as ScenarioLibrary["versions"][number]["changeSummary"]
+  }));
+}
+
+function readScenarioLibraryScenarios(db: Database.Database, libraryId: string): Scenario[] {
+  const rows = db.prepare(
+    `SELECT
+      scenario_id,
+      ordinal,
+      title,
+      priority,
+      type,
+      prerequisites_json,
+      steps_json,
+      expected_result,
+      risk_rationale,
+      approved_for_automation
+    FROM scenario_library_scenarios
+    WHERE library_id = ?
+    ORDER BY ordinal ASC, scenario_id ASC`
+  ).all(libraryId) as ScenarioLibraryScenarioRow[];
+
+  return rows.map((row) => ({
+    id: row.scenario_id,
+    title: row.title,
+    priority: row.priority,
+    type: row.type,
+    prerequisites: JSON.parse(row.prerequisites_json) as string[],
+    steps: JSON.parse(row.steps_json) as string[],
+    expectedResult: row.expected_result,
+    riskRationale: row.risk_rationale,
+    approvedForAutomation: Boolean(row.approved_for_automation)
+  }));
+}
+
+function mapRunSummaryRow(row: RunSummaryRow): RunSummary {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    startedAt: row.started_at ?? undefined,
+    completedAt: row.completed_at ?? undefined,
+    cancelRequestedAt: row.cancel_requested_at ?? undefined,
+    currentActivity: row.current_activity ?? undefined,
+    currentStepNumber: row.current_step_number ?? undefined,
+    currentScenarioIndex: row.current_scenario_index ?? undefined,
+    currentScenarioTitle: row.current_scenario_title ?? undefined,
+    plan: {
+      environment: row.environment,
+      targetUrl: row.target_url,
+      featureArea: row.feature_area,
+      mode: row.mode,
+      browser: row.browser ?? "Chromium",
+      role: row.role,
+      scenarioLibraryId: row.scenario_library_id ?? undefined
+    },
+    status: row.status,
+    currentPhase: row.current_phase,
+    summary: row.summary,
+    counts: {
+      parsedSteps: row.parsed_step_count ?? 0,
+      generatedScenarios: row.generated_scenario_count ?? 0,
+      stepResults: row.step_result_count ?? 0,
+      artifacts: row.artifact_count ?? 0,
+      defects: row.defect_count ?? 0
+    }
+  };
+}
+
+function listRunSummariesFromSql(db: Database.Database): RunSummary[] {
+  const rows = db.prepare(
+    `SELECT
+      runs.id,
+      runs.created_at,
+      runs.updated_at,
+      runs.status,
+      run_details.started_at,
+      run_details.completed_at,
+      run_details.cancel_requested_at,
+      run_details.current_phase,
+      run_details.current_activity,
+      run_details.current_step_number,
+      run_details.current_scenario_index,
+      run_details.current_scenario_title,
+      run_details.summary,
+      run_details.feature_area,
+      run_details.environment,
+      run_details.target_url,
+      run_details.mode,
+      run_details.browser,
+      run_details.role,
+      run_details.scenario_library_id,
+      run_metrics.parsed_step_count,
+      run_metrics.generated_scenario_count,
+      run_metrics.step_result_count,
+      run_metrics.artifact_count,
+      run_metrics.defect_count
+    FROM runs
+    INNER JOIN run_details ON run_details.run_id = runs.id
+    LEFT JOIN run_metrics ON run_metrics.run_id = runs.id
+    ORDER BY runs.created_at DESC`
+  ).all() as RunSummaryRow[];
+
+  return rows.map(mapRunSummaryRow);
+}
+
+function hydrateRunRecord(db: Database.Database, row: RunRow | undefined): RunRecord | undefined {
+  const base = parseRunRow(row);
+
+  if (!base) {
+    return undefined;
+  }
+
+  const details = readRunDetails(db, base.id);
+  const metrics = readRunMetrics(db, base.id);
+  const events = readRunEvents(db, base.id);
+  const stepResults = readStepResults(db, base.id);
+  const artifacts = readRunArtifacts(db, base.id);
+
+  return normalizeRunRecord({
+    ...base,
+    startedAt: details?.started_at ?? base.startedAt,
+    completedAt: details?.completed_at ?? base.completedAt,
+    cancelRequestedAt: details?.cancel_requested_at ?? base.cancelRequestedAt,
+    currentPhase: details?.current_phase ?? base.currentPhase,
+    currentActivity: details?.current_activity ?? base.currentActivity,
+    currentStepNumber: details?.current_step_number ?? base.currentStepNumber,
+    currentScenarioIndex: details?.current_scenario_index ?? base.currentScenarioIndex,
+    currentScenarioTitle: details?.current_scenario_title ?? base.currentScenarioTitle,
+    summary: details?.summary ?? base.summary,
+    plan: details
+      ? {
+          ...base.plan,
+          featureArea: details.feature_area,
+          environment: details.environment,
+          targetUrl: details.target_url,
+          mode: details.mode,
+          browser: details.browser ?? base.plan.browser,
+          role: details.role,
+          scenarioLibraryId: details.scenario_library_id ?? base.plan.scenarioLibraryId
+        }
+      : base.plan,
+    events: events.length ? events : base.events,
+    stepResults: stepResults.length || metrics?.step_result_count === 0 ? stepResults : base.stepResults,
+    artifacts: artifacts.length || metrics?.artifact_count === 0 ? artifacts : base.artifacts
+  });
+}
+
+function hydrateScenarioLibrary(db: Database.Database, row: ScenarioLibraryRow | undefined): ScenarioLibrary | undefined {
+  const base = parseScenarioLibraryRow(row);
+
+  if (!base) {
+    return undefined;
+  }
+
+  const details = readScenarioLibraryDetails(db, base.id);
+  const versions = readScenarioLibraryVersions(db, base.id);
+  const scenarios = readScenarioLibraryScenarios(db, base.id);
+
+  return normalizeScenarioLibraryRecord({
+    ...base,
+    sourceRunId: details?.source_run_id ?? base.sourceRunId,
+    featureArea: details?.feature_area ?? base.featureArea,
+    environment: details?.environment ?? base.environment,
+    targetUrl: details?.target_url ?? base.targetUrl,
+    role: details?.role ?? base.role,
+    createdAt: details?.created_at ?? base.createdAt,
+    version: details?.version ?? base.version,
+    riskSummary: details ? (JSON.parse(details.risk_summary_json) as string[]) : base.riskSummary,
+    coverageGaps: details ? (JSON.parse(details.coverage_gaps_json) as string[]) : base.coverageGaps,
+    versions: versions.length ? versions : base.versions,
+    scenarios: scenarios.length ? scenarios : base.scenarios
+  });
+}
+
+function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
+  db.prepare(
+    `INSERT INTO runs (id, created_at, updated_at, status, payload)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      created_at = excluded.created_at,
+      updated_at = excluded.updated_at,
+      status = excluded.status,
+      payload = excluded.payload`
+  ).run(run.id, run.createdAt, run.updatedAt, run.status, JSON.stringify(run));
+
+  db.prepare(
+    `INSERT INTO run_details (
+      run_id,
+      started_at,
+      completed_at,
+      cancel_requested_at,
+      current_phase,
+      current_activity,
+      current_step_number,
+      current_scenario_index,
+      current_scenario_title,
+      summary,
+      feature_area,
+      environment,
+      target_url,
+      mode,
+      browser,
+      role,
+      scenario_library_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(run_id) DO UPDATE SET
+      started_at = excluded.started_at,
+      completed_at = excluded.completed_at,
+      cancel_requested_at = excluded.cancel_requested_at,
+      current_phase = excluded.current_phase,
+      current_activity = excluded.current_activity,
+      current_step_number = excluded.current_step_number,
+      current_scenario_index = excluded.current_scenario_index,
+      current_scenario_title = excluded.current_scenario_title,
+      summary = excluded.summary,
+      feature_area = excluded.feature_area,
+      environment = excluded.environment,
+      target_url = excluded.target_url,
+      mode = excluded.mode,
+        browser = excluded.browser,
+      role = excluded.role,
+      scenario_library_id = excluded.scenario_library_id`
+  ).run(
+    run.id,
+    run.startedAt ?? null,
+    run.completedAt ?? null,
+    run.cancelRequestedAt ?? null,
+    run.currentPhase,
+    run.currentActivity ?? null,
+    run.currentStepNumber ?? null,
+    run.currentScenarioIndex ?? null,
+    run.currentScenarioTitle ?? null,
+    run.summary,
+    run.plan.featureArea,
+    run.plan.environment,
+    run.plan.targetUrl,
+    run.plan.mode,
+    run.plan.browser,
+    run.plan.role,
+    run.plan.scenarioLibraryId ?? null
+  );
+
+  db.prepare(
+    `INSERT INTO run_metrics (
+      run_id,
+      parsed_step_count,
+      generated_scenario_count,
+      step_result_count,
+      artifact_count,
+      defect_count
+    ) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(run_id) DO UPDATE SET
+      parsed_step_count = excluded.parsed_step_count,
+      generated_scenario_count = excluded.generated_scenario_count,
+      step_result_count = excluded.step_result_count,
+      artifact_count = excluded.artifact_count,
+      defect_count = excluded.defect_count`
+  ).run(
+    run.id,
+    run.parsedSteps.length,
+    run.generatedScenarios.length,
+    run.stepResults.length,
+    run.artifacts.length,
+    run.defects.length
+  );
+
+  db.prepare("DELETE FROM run_events WHERE run_id = ?").run(run.id);
+  db.prepare("DELETE FROM step_results WHERE run_id = ?").run(run.id);
+  db.prepare("DELETE FROM run_artifacts WHERE run_id = ?").run(run.id);
+
+  const insertEvent = db.prepare(
+    `INSERT INTO run_events (
+      id,
+      run_id,
+      timestamp,
+      phase,
+      level,
+      message,
+      category,
+      step_number,
+      scenario_title
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const insertStepResult = db.prepare(
+    `INSERT INTO step_results (
+      step_id,
+      run_id,
+      step_number,
+      user_step_text,
+      normalized_action,
+      observed_target,
+      action_result,
+      assertion_result,
+      notes,
+      screenshot_label,
+      screenshot_artifact_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const insertArtifact = db.prepare(
+    `INSERT INTO run_artifacts (
+      id,
+      run_id,
+      ordinal,
+      type,
+      label,
+      content
+    ) VALUES (?, ?, ?, ?, ?, ?)`
+  );
+
+  for (const event of run.events) {
+    insertEvent.run(
+      event.id,
+      run.id,
+      event.timestamp,
+      event.phase,
+      event.level,
+      event.message,
+      event.category ?? null,
+      event.stepNumber ?? null,
+      event.scenarioTitle ?? null
+    );
+  }
+
+  for (const stepResult of run.stepResults) {
+    insertStepResult.run(
+      stepResult.stepId,
+      run.id,
+      stepResult.stepNumber,
+      stepResult.userStepText,
+      stepResult.normalizedAction,
+      stepResult.observedTarget,
+      stepResult.actionResult,
+      stepResult.assertionResult,
+      stepResult.notes,
+      stepResult.screenshotLabel,
+      stepResult.screenshotArtifactId ?? null
+    );
+  }
+
+  run.artifacts.forEach((artifact, index) => {
+    insertArtifact.run(artifact.id, run.id, index, artifact.type, artifact.label, artifact.content);
+  });
+}
+
+function writeRunRecord(db: Database.Database, run: RunRecord): RunRecord {
+  const normalized = sanitizeRunRecordContent(normalizeRunRecord(run));
+  const transaction = db.transaction((nextRun: RunRecord) => {
+    writeNormalizedRunTables(db, nextRun);
+  });
+  transaction(normalized);
+  return normalized;
+}
+
+function writeScenarioLibraryRecord(db: Database.Database, library: ScenarioLibrary): ScenarioLibrary {
+  const normalized = normalizeScenarioLibraryRecord(library);
+  const transaction = db.transaction((nextLibrary: ScenarioLibrary) => {
+    db.prepare(
+      "INSERT INTO scenario_libraries (id, name, updated_at, payload) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, payload = excluded.payload"
+    ).run(nextLibrary.id, nextLibrary.name, nextLibrary.updatedAt, JSON.stringify(nextLibrary));
+
+    db.prepare(
+      `INSERT INTO scenario_library_details (
+        library_id,
+        source_run_id,
+        feature_area,
+        environment,
+        target_url,
+        role,
+        created_at,
+        version,
+        risk_summary_json,
+        coverage_gaps_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(library_id) DO UPDATE SET
+        source_run_id = excluded.source_run_id,
+        feature_area = excluded.feature_area,
+        environment = excluded.environment,
+        target_url = excluded.target_url,
+        role = excluded.role,
+        created_at = excluded.created_at,
+        version = excluded.version,
+        risk_summary_json = excluded.risk_summary_json,
+        coverage_gaps_json = excluded.coverage_gaps_json`
+    ).run(
+      nextLibrary.id,
+      nextLibrary.sourceRunId ?? null,
+      nextLibrary.featureArea,
+      nextLibrary.environment,
+      nextLibrary.targetUrl,
+      nextLibrary.role,
+      nextLibrary.createdAt,
+      nextLibrary.version,
+      JSON.stringify(nextLibrary.riskSummary),
+      JSON.stringify(nextLibrary.coverageGaps)
+    );
+
+    db.prepare("DELETE FROM scenario_library_versions WHERE library_id = ?").run(nextLibrary.id);
+    db.prepare("DELETE FROM scenario_library_scenarios WHERE library_id = ?").run(nextLibrary.id);
+
+    const insertVersion = db.prepare(
+      `INSERT INTO scenario_library_versions (
+        library_id,
+        version,
+        created_at,
+        source_run_id,
+        scenario_count,
+        summary,
+        change_summary_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    const insertScenario = db.prepare(
+      `INSERT INTO scenario_library_scenarios (
+        scenario_id,
+        library_id,
+        ordinal,
+        title,
+        priority,
+        type,
+        prerequisites_json,
+        steps_json,
+        expected_result,
+        risk_rationale,
+        approved_for_automation
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+
+    for (const version of nextLibrary.versions) {
+      insertVersion.run(
+        nextLibrary.id,
+        version.version,
+        version.createdAt,
+        version.sourceRunId ?? null,
+        version.scenarioCount,
+        version.summary,
+        JSON.stringify(version.changeSummary)
+      );
+    }
+
+    nextLibrary.scenarios.forEach((scenario, index) => {
+      insertScenario.run(
+        scenario.id,
+        nextLibrary.id,
+        index,
+        scenario.title,
+        scenario.priority,
+        scenario.type,
+        JSON.stringify(scenario.prerequisites),
+        JSON.stringify(scenario.steps),
+        scenario.expectedResult,
+        scenario.riskRationale,
+        scenario.approvedForAutomation ? 1 : 0
+      );
+    });
+  });
+
+  transaction(normalized);
+
+  return normalized;
+}
+
+function openDatabase(): Database.Database {
+  if (database) {
+    return database;
+  }
+
+  mkdirSync(dataDirectory, { recursive: true });
+  const db = new Database(sqliteDatabasePath);
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id TEXT PRIMARY KEY,
+      applied_at TEXT NOT NULL
+    );
+  `);
+
+  const migrationFiles = readdirSync(sqliteMigrationsDirectory)
+    .filter((entry) => entry.endsWith(".sql"))
+    .sort();
+  const appliedRows = db.prepare("SELECT id FROM schema_migrations ORDER BY id").all() as Array<{ id: string }>;
+  const applied = new Set(appliedRows.map((row) => row.id));
+
+  for (const fileName of migrationFiles) {
+    if (applied.has(fileName)) {
+      continue;
+    }
+
+    const sql = readFileSync(path.join(sqliteMigrationsDirectory, fileName), "utf8");
+    const transaction = db.transaction(() => {
+      db.exec(sql);
+      db.prepare("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run(fileName, new Date().toISOString());
+    });
+    transaction();
+  }
+
+  const runCount = Number((db.prepare("SELECT COUNT(*) AS count FROM runs").get() as { count: number }).count);
+  const libraryCount = Number((db.prepare("SELECT COUNT(*) AS count FROM scenario_libraries").get() as { count: number }).count);
+
+  if (runCount === 0 && libraryCount === 0) {
+    const seed = db.transaction(() => {
+      const data = readSeedDataFromJsonStoreSync();
+
+      for (const run of data.runs) {
+        writeRunRecord(db, run);
+      }
+
+      for (const library of data.scenarioLibraries) {
+        writeScenarioLibraryRecord(db, library);
+      }
+    });
+
+    seed();
+  }
+
+  database = db;
+  return db;
+}
+
+function parseRunRow(row: RunRow | undefined): RunRecord | undefined {
+  return row ? normalizeRunRecord(JSON.parse(row.payload) as RunRecord) : undefined;
+}
+
+function parseScenarioLibraryRow(row: ScenarioLibraryRow | undefined): ScenarioLibrary | undefined {
+  return row ? normalizeScenarioLibraryRecord(JSON.parse(row.payload) as ScenarioLibrary) : undefined;
+}
+
+function createSqliteStoreBackend(): QaStoreBackend {
+  function listRunsInternal(): RunRecord[] {
+    const db = openDatabase();
+    const rows = db.prepare("SELECT id, payload FROM runs ORDER BY created_at DESC").all() as RunRow[];
+    return sortRuns(rows.map((row) => hydrateRunRecord(db, row)).filter((run): run is RunRecord => Boolean(run)));
+  }
+
+  function getRunInternal(runId: string): RunRecord | undefined {
+    const db = openDatabase();
+    return hydrateRunRecord(db, db.prepare("SELECT id, payload FROM runs WHERE id = ?").get(runId) as RunRow | undefined);
+  }
+
+  function writeRun(run: RunRecord): RunRecord {
+    const db = openDatabase();
+    return writeRunRecord(db, run);
+  }
+
+  function listScenarioLibrariesInternal(): ScenarioLibrary[] {
+    const db = openDatabase();
+    const rows = db.prepare("SELECT id, payload FROM scenario_libraries ORDER BY updated_at DESC").all() as ScenarioLibraryRow[];
+    return sortScenarioLibraries(rows.map((row) => hydrateScenarioLibrary(db, row)).filter((library): library is ScenarioLibrary => Boolean(library)));
+  }
+
+  function getScenarioLibraryInternal(scenarioLibraryId: string): ScenarioLibrary | undefined {
+    const db = openDatabase();
+    return hydrateScenarioLibrary(db, db.prepare("SELECT id, payload FROM scenario_libraries WHERE id = ?").get(scenarioLibraryId) as ScenarioLibraryRow | undefined);
+  }
+
+  function writeScenarioLibrary(library: ScenarioLibrary): ScenarioLibrary {
+    const db = openDatabase();
+    return writeScenarioLibraryRecord(db, library);
+  }
+
+  function mutateRun(runId: string, mutate: (run: RunRecord) => RunRecord): RunRecord | undefined {
+    const existing = getRunInternal(runId);
+    return existing ? writeRun(mutate(existing)) : undefined;
+  }
+
+  return {
+    async listScenarioLibraries(): Promise<ScenarioLibrary[]> {
+      return listScenarioLibrariesInternal();
+    },
+    async getScenarioLibrary(scenarioLibraryId: string): Promise<ScenarioLibrary | undefined> {
+      return getScenarioLibraryInternal(scenarioLibraryId);
+    },
+    async upsertScenarioLibraryFromRun(
+      plan: RunPlan,
+      generated: GenerateScenariosResponse,
+      sourceRunId?: string,
+      scenarioLibraryId?: string,
+      libraryName?: string
+    ): Promise<ScenarioLibrary> {
+      const libraries = listScenarioLibrariesInternal();
+      const now = new Date().toISOString();
+      const existing = scenarioLibraryId
+        ? libraries.find((library) => library.id === scenarioLibraryId)
+        : findExistingScenarioLibraryForCreate(libraries, plan, libraryName);
+      return writeScenarioLibrary(buildScenarioLibraryRecord(existing, plan, generated, now, sourceRunId, libraryName));
+    },
+    async listRuns(): Promise<RunRecord[]> {
+      return listRunsInternal();
+    },
+    async listRunSummaries(): Promise<RunSummary[]> {
+      const db = openDatabase();
+      const summaries = listRunSummariesFromSql(db);
+      return summaries.length ? summaries : listRunsInternal().map(buildRunSummary);
+    },
+    async getRun(runId: string): Promise<RunRecord | undefined> {
+      return getRunInternal(runId);
+    },
+    async getRunArtifact(runId: string, artifactId: string): Promise<Artifact | undefined> {
+      const db = openDatabase();
+      const artifact = readRunArtifact(db, runId, artifactId);
+
+      if (artifact) {
+        return artifact;
+      }
+
+      const run = getRunInternal(runId);
+      return run?.artifacts.find((candidate) => candidate.id === artifactId);
+    },
+    async updateRunState(runId: string, patch: RunRecordPatch): Promise<RunRecord | undefined> {
+      return mutateRun(runId, (run) => mergeRunRecord(run, patch));
+    },
+    async appendRunEvent(
+      runId: string,
+      event: Omit<RunEvent, "id" | "timestamp"> & Partial<Pick<RunEvent, "id" | "timestamp">>
+    ): Promise<RunRecord | undefined> {
+      return mutateRun(runId, (run) => ({ ...run, updatedAt: new Date().toISOString(), events: [...run.events, createRunEvent(event)] }));
+    },
+    async appendRunWarning(
+      runId: string,
+      warning: Omit<ExecutionWarning, "id" | "timestamp"> & Partial<Pick<ExecutionWarning, "id" | "timestamp">>
+    ): Promise<RunRecord | undefined> {
+      const nextWarning = createExecutionWarning(warning);
+      return mutateRun(runId, (run) => ({
+        ...run,
+        updatedAt: new Date().toISOString(),
+        warnings: [...run.warnings, nextWarning],
+        events: [
+          ...run.events,
+          createRunEvent({
+            phase: nextWarning.phase,
+            level: "warning",
+            message: nextWarning.message,
+            category: nextWarning.category,
+            stepNumber: nextWarning.stepNumber,
+            scenarioTitle: nextWarning.scenarioTitle,
+            timestamp: nextWarning.timestamp
+          })
+        ]
+      }));
+    },
+    async listRunEvents(runId: string): Promise<RunEvent[]> {
+      const db = openDatabase();
+      const events = readRunEvents(db, runId);
+
+      if (events.length) {
+        return events;
+      }
+
+      const run = getRunInternal(runId);
+      return [...(run?.events ?? [])].sort((left, right) => left.timestamp.localeCompare(right.timestamp));
+    },
+    async requestRunCancellation(runId: string): Promise<RunRecord | undefined> {
+      const now = new Date().toISOString();
+      return mutateRun(runId, (run) => {
+        if (isTerminalRunStatus(run.status)) {
+          return run;
+        }
+        if (run.status === "draft" || run.status === "queued") {
+          const cancelledStatus: RunStatus = "cancelled";
+          return {
+            ...run,
+            status: cancelledStatus,
+            currentPhase: "cancelled",
+            summary: "Run was cancelled before execution started.",
+            cancelRequestedAt: now,
+            completedAt: now,
+            updatedAt: now,
+            events: [
+              ...run.events,
+              createRunEvent({ phase: "cancelled", level: "info", message: "Run was cancelled before execution started.", category: "cancelled", timestamp: now })
+            ]
+          };
+        }
+        if (run.cancelRequestedAt) {
+          return run;
+        }
+        return {
+          ...run,
+          cancelRequestedAt: now,
+          updatedAt: now,
+          events: [
+            ...run.events,
+            createRunEvent({ phase: run.currentPhase, level: "warning", message: "Cancellation requested. The run will stop at the next safe boundary.", category: "cancelled", timestamp: now })
+          ]
+        };
+      });
+    },
+    async createRun(plan: RunPlan): Promise<RunRecord> {
+      const parsed = parsePlainTextSteps(plan.stepsText);
+      const scenarioLibraries = listScenarioLibrariesInternal();
+      const selectedLibrary = plan.scenarioLibraryId
+        ? scenarioLibraries.find((library) => library.id === plan.scenarioLibraryId)
+        : findMatchingScenarioLibrary(scenarioLibraries, plan);
+      const generated = selectedLibrary
+        ? { scenarios: selectedLibrary.scenarios, coverageGaps: selectedLibrary.coverageGaps, riskSummary: selectedLibrary.riskSummary }
+        : generateScenarios(plan);
+      const now = new Date().toISOString();
+      const scenarioLibrary = selectedLibrary ?? (generated.scenarios.length ? await this.upsertScenarioLibraryFromRun(plan, generated) : undefined);
+      const planWithLibrary = scenarioLibrary ? { ...plan, scenarioLibraryId: scenarioLibrary.id } : plan;
+      return writeRun(sanitizeRunRecordContent({
+        id: createId("run"),
+        createdAt: now,
+        updatedAt: now,
+        plan: planWithLibrary,
+        parsedSteps: parsed.parsedSteps,
+        generatedScenarios: generated.scenarios,
+        status: "draft",
+        currentPhase: "intake",
+        summary: "Run created and ready for execution.",
+        riskSummary: generated.riskSummary,
+        coverageGaps: generated.coverageGaps,
+        stepResults: [],
+        artifacts: [],
+        defects: [],
+        analysisInsights: [],
+        scenarioLibraryComparison: selectedLibrary ? buildScenarioLibraryComparison(selectedLibrary, generated.scenarios) : undefined,
+        events: [createRunEvent({ phase: "intake", level: "info", message: "Run created and ready for execution.", category: "system", timestamp: now })],
+        warnings: []
+      }));
+    },
+    async saveRun(record: RunRecord): Promise<RunRecord> {
+      const scenarioLibraries = record.plan.scenarioLibraryId ? listScenarioLibrariesInternal() : [];
+      const existingLibrary = record.plan.scenarioLibraryId
+        ? scenarioLibraries.find((library) => library.id === record.plan.scenarioLibraryId)
+        : undefined;
+      const nextRecord = existingLibrary ? { ...record, scenarioLibraryComparison: buildScenarioLibraryComparison(existingLibrary, record.generatedScenarios) } : record;
+      const savedRecord = writeRun(nextRecord);
+      if (savedRecord.generatedScenarios.length && savedRecord.plan.scenarioLibraryId && savedRecord.plan.mode !== "regression-run") {
+        await this.upsertScenarioLibraryFromRun(
+          savedRecord.plan,
+          { scenarios: savedRecord.generatedScenarios, coverageGaps: savedRecord.coverageGaps, riskSummary: savedRecord.riskSummary },
+          savedRecord.id,
+          savedRecord.plan.scenarioLibraryId
+        );
+      }
+      return savedRecord;
+    }
+  };
+}
+
+export { createSqliteStoreBackend };

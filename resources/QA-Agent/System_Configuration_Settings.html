@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Settings | Forensic Ledger QA Command</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Newsreader:ital,wght@0,400;0,700;1,400;1,700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-dim": "#d6dbd7",
+                        "on-primary-fixed-variant": "#5c5b5b",
+                        "on-tertiary-fixed": "#4b3700",
+                        "tertiary-fixed-dim": "#efc76f",
+                        "surface-variant": "#e0e3e0",
+                        "on-secondary-fixed": "#3c4044",
+                        "on-secondary": "#f6f9ff",
+                        "on-secondary-container": "#4e5257",
+                        "primary": "#5f5e5e",
+                        "secondary": "#5b5f64",
+                        "on-error-container": "#752121",
+                        "inverse-primary": "#ffffff",
+                        "primary-fixed-dim": "#d6d4d3",
+                        "on-primary-container": "#525151",
+                        "on-tertiary-fixed-variant": "#6e5200",
+                        "on-error": "#fff7f6",
+                        "tertiary-dim": "#6a4f00",
+                        "secondary-container": "#dfe3e8",
+                        "error-container": "#fe8983",
+                        "background": "#faf9f7",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed-variant": "#585c61",
+                        "surface-container-highest": "#e0e3e0",
+                        "surface-tint": "#5f5e5e",
+                        "on-primary": "#faf7f6",
+                        "primary-container": "#e5e2e1",
+                        "error": "#9f403d",
+                        "on-background": "#2f3331",
+                        "surface-container-low": "#f3f4f1",
+                        "tertiary-container": "#fed57b",
+                        "surface-container-high": "#e6e9e6",
+                        "surface-container": "#edeeeb",
+                        "surface": "#faf9f7",
+                        "on-surface": "#2f3331",
+                        "tertiary": "#785b09",
+                        "secondary-fixed": "#dfe3e8",
+                        "error-dim": "#4e0309",
+                        "on-surface-variant": "#5c605d",
+                        "on-tertiary-container": "#624900",
+                        "inverse-on-surface": "#9d9d9b",
+                        "outline-variant": "#afb3b0",
+                        "primary-fixed": "#e5e2e1",
+                        "secondary-fixed-dim": "#d1d5da",
+                        "on-tertiary": "#fff8f0",
+                        "surface-bright": "#faf9f7",
+                        "on-surface": "#2f3331",
+                        "tertiary-fixed": "#fed57b",
+                        "secondary-dim": "#4f5358",
+                        "outline": "#777c79",
+                        "primary-dim": "#535252",
+                        "inverse-surface": "#0d0e0e"
+                    },
+                    fontFamily: {
+                        "headline": ["Newsreader"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: #faf9f7; }
+        .serif { font-family: 'Newsreader', serif; }
+        .ghost-border { border: 0.5px solid rgba(175, 179, 176, 0.15); }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#faf9f7] dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold font-['Newsreader'] text-zinc-900 dark:text-zinc-100 italic tracking-tight">Forensic Ledger</span>
+<nav class="hidden md:flex items-center gap-6 h-16">
+<a class="text-zinc-500 dark:text-zinc-400 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors px-2 h-full flex items-center" href="#">Dashboard</a>
+<a class="text-zinc-500 dark:text-zinc-400 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors px-2 h-full flex items-center" href="#">Operations</a>
+<a class="text-zinc-900 dark:text-zinc-100 font-bold border-b-2 border-zinc-900 dark:border-zinc-100 px-2 h-full flex items-center" href="#">Settings</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm" data-icon="search">search</span>
+<input class="bg-surface-container-low border-none focus:ring-2 focus:ring-primary text-sm pl-10 pr-4 py-1.5 w-64 rounded-sm" placeholder="Search archives..." type="text"/>
+</div>
+<button class="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors rounded-full">
+<span class="material-symbols-outlined text-zinc-700 dark:text-zinc-300" data-icon="help">help</span>
+</button>
+<button class="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors rounded-full">
+<span class="material-symbols-outlined text-zinc-700 dark:text-zinc-300" data-icon="notifications">notifications</span>
+</button>
+<img alt="User profile" class="w-8 h-8 rounded-full border border-outline-variant/20" data-alt="Close-up professional portrait of a senior technical architect with a focused expression in a dimly lit office" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8PBG-9wZrFGUIzUcBtM38rJcVGER9fa4kRN92MrUADWMW2peyVr23LcTT7JeDDBcVGaU1a5ABRWHtyqTD4XQefyZugdLYelzMVcftiXKkwpV1wMFn6h4nCb6RSF9NqZv75HWExSmmfQUsnNGVL4AOLe6y1UhJpme3Dje7mWNDv3fHU7UrGXzV62GvzEI7GirWmXHEjvS2Q4hVWk1hEuwa5cmuab3343ZHvp-14luZ2pQJksM1JtsAb_aanCf-fyp6wi8a0xvEh6o"/>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full flex flex-col pt-16 w-64 bg-[#f3f4f1] dark:bg-zinc-900 border-r border-zinc-200/50 dark:border-zinc-800/50 z-40">
+<div class="px-6 py-8">
+<h2 class="text-lg font-['Newsreader'] font-bold text-zinc-900 dark:text-zinc-100">QA Command</h2>
+<p class="text-[0.6875rem] font-medium uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mt-1">Operational Audit</p>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 transition-all duration-150 rounded-sm" href="#">
+<span class="material-symbols-outlined" data-icon="edit_note">edit_note</span>
+<span class="font-['Inter'] text-xs font-medium uppercase tracking-widest">Draft</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 transition-all duration-150 rounded-sm" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-['Inter'] text-xs font-medium uppercase tracking-widest">Monitor</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 transition-all duration-150 rounded-sm" href="#">
+<span class="material-symbols-outlined" data-icon="fact_check">fact_check</span>
+<span class="font-['Inter'] text-xs font-medium uppercase tracking-widest">Review</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 transition-all duration-150 rounded-sm" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-['Inter'] text-xs font-medium uppercase tracking-widest">Library</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-[#faf9f7] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 border-l-4 border-zinc-600 dark:border-zinc-400 transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-['Inter'] text-xs font-medium uppercase tracking-widest">Settings</span>
+</a>
+</nav>
+<div class="p-4 border-t border-outline-variant/10">
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-all text-xs uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="vpn_key">vpn_key</span>
+<span>Credentials</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-all text-xs uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="dns">dns</span>
+<span>Environments</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="ml-64 pt-24 px-10 pb-12 min-h-screen">
+<!-- Header -->
+<header class="mb-12 max-w-5xl">
+<h1 class="text-5xl serif italic font-bold tracking-tight text-on-surface mb-2">System Configuration</h1>
+<p class="text-on-surface-variant font-body">Manage operational assets and security credentials.</p>
+</header>
+<div class="grid grid-cols-12 gap-8 max-w-7xl">
+<!-- SECTION 1: Active Credential Vault -->
+<section class="col-span-12 lg:col-span-5 space-y-6">
+<div class="flex items-center justify-between">
+<h3 class="text-[0.6875rem] font-bold uppercase tracking-[0.15em] text-primary">Active Credential Vault</h3>
+<span class="text-[0.6875rem] text-outline italic">Last encrypted: 14m ago</span>
+</div>
+<div class="bg-surface-container-low p-6 ghost-border relative overflow-hidden">
+<!-- Aesthetic Grid Underlay -->
+<div class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: radial-gradient(#000 1px, transparent 1px); background-size: 20px 20px;"></div>
+<div class="space-y-4 relative z-10">
+<!-- Credential Card 1 -->
+<div class="bg-surface-container-lowest p-5 ghost-border shadow-sm">
+<div class="flex justify-between items-start mb-4">
+<div>
+<div class="text-[0.625rem] text-primary font-bold uppercase tracking-wider mb-1">Identity Access</div>
+<h4 class="font-bold text-on-surface tracking-tight">Main Admin Node</h4>
+</div>
+<span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[0.625rem] font-bold uppercase tracking-widest rounded-sm">Active</span>
+</div>
+<div class="space-y-3 mb-6">
+<div class="border-b border-outline-variant/10 pb-2">
+<span class="text-[0.625rem] text-outline block uppercase mb-1">Email / Username</span>
+<span class="text-sm font-medium">admin@forensic-ledger.internal</span>
+</div>
+<div class="border-b border-outline-variant/10 pb-2">
+<span class="text-[0.625rem] text-outline block uppercase mb-1">Password</span>
+<span class="text-sm font-mono tracking-tighter">••••••••••••••••</span>
+</div>
+<div>
+<span class="text-[0.625rem] text-outline block uppercase mb-1">MFA Token</span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-tertiary" data-icon="lock_clock">lock_clock</span>
+<span class="text-sm font-mono">Totp: Enabled</span>
+</div>
+</div>
+</div>
+<div class="flex justify-between items-center pt-4 border-t border-outline-variant/20">
+<span class="text-[0.625rem] text-outline italic">Used: 2h 14m ago via London-Edge</span>
+<div class="flex gap-2">
+<button class="px-3 py-1.5 bg-surface-container-high text-on-surface text-[0.6875rem] font-bold uppercase tracking-wider hover:bg-surface-container-highest transition-colors">Rotate</button>
+<button class="px-3 py-1.5 bg-primary text-on-primary text-[0.6875rem] font-bold uppercase tracking-wider hover:bg-primary-dim transition-colors">Change</button>
+</div>
+</div>
+</div>
+<!-- Credential Card 2 (Revoked State) -->
+<div class="bg-surface-container-lowest p-5 ghost-border opacity-70 grayscale-[0.5]">
+<div class="flex justify-between items-start mb-4">
+<div>
+<div class="text-[0.625rem] text-primary font-bold uppercase tracking-wider mb-1">Automated Worker</div>
+<h4 class="font-bold text-on-surface tracking-tight">Staging-Bot-04</h4>
+</div>
+<span class="px-2 py-0.5 bg-error-container text-on-error-container text-[0.625rem] font-bold uppercase tracking-widest rounded-sm">Revoked</span>
+</div>
+<div class="flex justify-between items-center pt-2">
+<span class="text-[0.625rem] text-outline italic">Deactivated by System Admin on 2023-11-20</span>
+<button class="px-3 py-1.5 text-on-surface-variant text-[0.6875rem] font-bold uppercase tracking-wider hover:text-on-surface transition-colors underline underline-offset-4">Restore Access</button>
+</div>
+</div>
+<!-- New Credential Action -->
+<button class="w-full py-4 border-2 border-dashed border-outline-variant/30 text-on-surface-variant text-[0.6875rem] font-bold uppercase tracking-[0.2em] hover:bg-white/50 transition-colors flex flex-col items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="add_moderator">add_moderator</span>
+                            Vault New Credential
+                        </button>
+</div>
+</div>
+</section>
+<!-- SECTION 2: Environment Management -->
+<section class="col-span-12 lg:col-span-7 space-y-6">
+<div class="flex items-center justify-between">
+<h3 class="text-[0.6875rem] font-bold uppercase tracking-[0.15em] text-primary">Environment Management</h3>
+<div class="flex gap-4">
+<button class="text-[0.6875rem] font-bold text-primary border-b border-primary">Grid View</button>
+<button class="text-[0.6875rem] font-bold text-outline">Topology</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Env Card 1 -->
+<div class="bg-surface-container-lowest p-6 ghost-border flex flex-col justify-between h-64 hover:border-outline-variant/50 transition-colors group">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></div>
+<span class="text-[0.625rem] text-emerald-700 font-bold uppercase tracking-widest">Online</span>
+</div>
+<h4 class="text-2xl serif italic font-bold text-on-surface group-hover:text-primary transition-colors">Production</h4>
+<p class="text-[0.6875rem] font-mono text-outline-variant break-all mt-1">https://api.forensic-ledger.com</p>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between items-end border-b border-outline-variant/10 pb-1">
+<span class="text-[0.625rem] text-outline uppercase tracking-wider">Latency</span>
+<span class="text-sm font-bold">24ms <span class="text-emerald-600">↓</span></span>
+</div>
+<div class="flex justify-between items-end border-b border-outline-variant/10 pb-1">
+<span class="text-[0.625rem] text-outline uppercase tracking-wider">Uptime</span>
+<span class="text-sm font-bold">99.998%</span>
+</div>
+</div>
+<div class="flex gap-2 mt-4">
+<button class="flex-1 py-2 bg-primary text-on-primary text-[0.6875rem] font-bold uppercase tracking-widest rounded-sm">Connect</button>
+<button class="p-2 bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors rounded-sm">
+<span class="material-symbols-outlined text-sm" data-icon="settings">settings</span>
+</button>
+</div>
+</div>
+<!-- Env Card 2 -->
+<div class="bg-surface-container-lowest p-6 ghost-border flex flex-col justify-between h-64 hover:border-outline-variant/50 transition-colors group">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="h-2 w-2 rounded-full bg-tertiary shadow-[0_0_8px_rgba(120,91,9,0.3)]"></div>
+<span class="text-[0.625rem] text-tertiary font-bold uppercase tracking-widest">Degraded</span>
+</div>
+<h4 class="text-2xl serif italic font-bold text-on-surface group-hover:text-primary transition-colors">Staging-Global</h4>
+<p class="text-[0.6875rem] font-mono text-outline-variant break-all mt-1">https://staging.internal.f-l.io</p>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between items-end border-b border-outline-variant/10 pb-1">
+<span class="text-[0.625rem] text-outline uppercase tracking-wider">Latency</span>
+<span class="text-sm font-bold text-tertiary">182ms <span class="text-tertiary font-bold">↑</span></span>
+</div>
+<div class="flex justify-between items-end border-b border-outline-variant/10 pb-1">
+<span class="text-[0.625rem] text-outline uppercase tracking-wider">Uptime</span>
+<span class="text-sm font-bold">98.42%</span>
+</div>
+</div>
+<div class="flex gap-2 mt-4">
+<button class="flex-1 py-2 bg-primary text-on-primary text-[0.6875rem] font-bold uppercase tracking-widest rounded-sm">Connect</button>
+<button class="p-2 bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors rounded-sm">
+<span class="material-symbols-outlined text-sm" data-icon="warning">warning</span>
+</button>
+</div>
+</div>
+<!-- Env Card 3 -->
+<div class="bg-surface-container-lowest p-6 ghost-border flex flex-col justify-between h-64 hover:border-outline-variant/50 transition-colors group">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="h-2 w-2 rounded-full bg-outline-variant"></div>
+<span class="text-[0.625rem] text-outline font-bold uppercase tracking-widest">Maintenance</span>
+</div>
+<h4 class="text-2xl serif italic font-bold text-on-surface group-hover:text-primary transition-colors">Dev-Alpha</h4>
+<p class="text-[0.6875rem] font-mono text-outline-variant break-all mt-1">https://dev-01.local.test</p>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between items-end border-b border-outline-variant/10 pb-1">
+<span class="text-[0.625rem] text-outline uppercase tracking-wider">Latency</span>
+<span class="text-sm font-bold">--</span>
+</div>
+<div class="flex justify-between items-end border-b border-outline-variant/10 pb-1">
+<span class="text-[0.625rem] text-outline uppercase tracking-wider">Scheduled Down</span>
+<span class="text-sm font-bold">04:00h</span>
+</div>
+</div>
+<div class="flex gap-2 mt-4">
+<button class="flex-1 py-2 bg-surface-container-high text-outline text-[0.6875rem] font-bold uppercase tracking-widest rounded-sm" disabled="">Connect</button>
+<button class="p-2 bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors rounded-sm">
+<span class="material-symbols-outlined text-sm" data-icon="build">build</span>
+</button>
+</div>
+</div>
+<!-- Add Env Card -->
+<div class="border-2 border-dashed border-outline-variant/20 p-6 flex flex-col items-center justify-center h-64 hover:bg-surface-container-low transition-all cursor-pointer group">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-primary" data-icon="add">add</span>
+</div>
+<span class="text-[0.6875rem] font-bold uppercase tracking-[0.2em] text-on-surface-variant">Deploy Environment</span>
+</div>
+</div>
+<!-- Environmental Log (Editorial Detail) -->
+<div class="bg-surface-container-high/40 p-4 border-l-2 border-primary mt-8">
+<p class="text-[0.625rem] font-bold uppercase tracking-widest text-primary mb-2">Audit Observation</p>
+<p class="text-xs italic serif leading-relaxed text-on-surface-variant">
+                        "The high latency observed in Staging-Global (182ms) matches the pattern identified during the Q3 infrastructure review. Local nodes remain resilient, but cross-regional synchronization is currently throttled for database indexing."
+                    </p>
+</div>
+</section>
+</div>
+</main>
+<!-- Contextual Footer Metadata -->
+<footer class="ml-64 px-10 py-6 border-t border-outline-variant/10 flex justify-between items-center text-[0.625rem] font-medium uppercase tracking-[0.1em] text-outline">
+<div>System Version: 4.2.0-Alpha.Evidence</div>
+<div class="flex gap-6">
+<span>Server Time: 14:22:10 UTC</span>
+<span class="text-primary font-bold">Connection Secure</span>
+</div>
+</footer>
+</body></html>

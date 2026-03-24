@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Forensic Ledger | QA Command Center</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,700;1,6..72,400&amp;display=swap" rel="stylesheet"/>
+<!-- Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "error": "#9f403d",
+                        "primary-fixed": "#e5e2e1",
+                        "on-surface-variant": "#5c605d",
+                        "secondary-container": "#dfe3e8",
+                        "surface-container": "#edeeeb",
+                        "on-error": "#fff7f6",
+                        "on-primary-container": "#525151",
+                        "on-secondary-container": "#4e5257",
+                        "surface-tint": "#5f5e5e",
+                        "secondary-fixed": "#dfe3e8",
+                        "on-primary": "#faf7f6",
+                        "tertiary-dim": "#6a4f00",
+                        "primary-dim": "#535252",
+                        "on-secondary": "#f6f9ff",
+                        "surface": "#faf9f7",
+                        "on-tertiary-container": "#624900",
+                        "surface-container-highest": "#e0e3e0",
+                        "background": "#faf9f7",
+                        "surface-dim": "#d6dbd7",
+                        "primary-fixed-dim": "#d6d4d3",
+                        "on-secondary-fixed": "#3c4044",
+                        "on-tertiary-fixed-variant": "#6e5200",
+                        "tertiary-fixed": "#fed57b",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f3f4f1",
+                        "on-surface": "#2f3331",
+                        "outline-variant": "#afb3b0",
+                        "error-dim": "#4e0309",
+                        "inverse-surface": "#0d0e0e",
+                        "primary": "#5f5e5e",
+                        "surface-container-high": "#e6e9e6",
+                        "surface-bright": "#faf9f7",
+                        "inverse-primary": "#ffffff",
+                        "on-background": "#2f3331",
+                        "secondary-dim": "#4f5358",
+                        "primary-container": "#e5e2e1",
+                        "tertiary": "#785b09",
+                        "on-tertiary-fixed": "#4b3700",
+                        "on-primary-fixed-variant": "#5c5b5b",
+                        "inverse-on-surface": "#9d9d9b",
+                        "tertiary-fixed-dim": "#efc76f",
+                        "surface-variant": "#e0e3e0",
+                        "outline": "#777c79",
+                        "on-tertiary": "#fff8f0",
+                        "on-error-container": "#752121",
+                        "secondary-fixed-dim": "#d1d5da",
+                        "on-secondary-fixed-variant": "#585c61",
+                        "tertiary-container": "#fed57b",
+                        "secondary": "#5b5f64",
+                        "error-container": "#fe8983",
+                        "on-primary-fixed": "#403f3f"
+                    },
+                    fontFamily: {
+                        "headline": ["Newsreader", "serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .serif-italic { font-family: 'Newsreader', serif; font-style: italic; }
+        .label-micro { font-family: 'Inter', sans-serif; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .ruled-divider { border-bottom: 1px solid rgba(175, 179, 176, 0.2); }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased">
+<!-- SideNavBar Shell -->
+<aside class="fixed inset-y-0 left-0 z-50 flex flex-col py-6 px-4 h-screen w-64 border-r border-outline-variant/15 bg-surface-container-low dark:bg-stone-900">
+<div class="mb-10 px-2">
+<h1 class="text-xl font-headline italic text-primary dark:text-stone-200">Forensic Ledger</h1>
+<p class="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant/70 mt-1">QA Command Center</p>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Active: Draft -->
+<a class="flex items-center px-3 py-2.5 transition-colors text-primary dark:text-white font-bold border-r-2 border-primary hover:bg-outline-variant/10 active:scale-[0.98] duration-150" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="edit_note">edit_note</span>
+<span class="label-micro !text-[11px] tracking-wider">Draft</span>
+</a>
+<a class="flex items-center px-3 py-2.5 transition-colors text-primary/60 dark:text-stone-500 font-medium hover:bg-outline-variant/10 active:scale-[0.98] duration-150" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="visibility">visibility</span>
+<span class="label-micro !text-[11px] tracking-wider">Monitor</span>
+</a>
+<a class="flex items-center px-3 py-2.5 transition-colors text-primary/60 dark:text-stone-500 font-medium hover:bg-outline-variant/10 active:scale-[0.98] duration-150" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="verified">verified</span>
+<span class="label-micro !text-[11px] tracking-wider">Review</span>
+</a>
+</nav>
+<div class="mt-auto space-y-1 pt-6 border-t border-outline-variant/15">
+<button class="w-full bg-primary text-on-primary py-2.5 mb-4 rounded-sm text-sm font-medium hover:bg-primary-dim transition-colors active:scale-[0.98]">
+                New Mission
+            </button>
+<a class="flex items-center px-3 py-2 text-primary/60 dark:text-stone-500 hover:bg-outline-variant/10" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-icon="settings">settings</span>
+<span class="label-micro">Settings</span>
+</a>
+<a class="flex items-center px-3 py-2 text-primary/60 dark:text-stone-500 hover:bg-outline-variant/10" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-icon="inventory_2">inventory_2</span>
+<span class="label-micro">Archives</span>
+</a>
+<div class="flex items-center gap-3 px-3 mt-6">
+<div class="w-8 h-8 bg-surface-container-highest rounded-full flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="professional portrait of a technical operator in a dark workspace with soft ambient lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBe7CwD8U3p0m6FW4k6SI8zDPO7XGcOlZMIrL_8On6HFmfHzX24vxrgsE0P3UBRgrALV9BVipmWCh7rjMEpdBRqgK43x6BRMZoLW2h2i5SSameXYhuZaz3oC5O9zePNvUTGfT15qoeV4Fg_nkXVxjg4GoPm3dRpq3IHGFW6mWaTRmsJAyg0E_iSDDACruohiJOBV-4MwFZ9yXanMdka9jCdEQ_VVkJWZeFIKKdFwgst37LZKX-dB8oHtUhKixSG4pmB4-8aIP63u8w"/>
+</div>
+<div class="flex flex-col">
+<span class="text-xs font-bold leading-none">Operator Profile</span>
+<span class="text-[10px] text-on-surface-variant">Level 4 Clearance</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 right-0 left-64 flex justify-between items-center px-8 h-16 z-40 bg-surface dark:bg-stone-950 border-b border-outline-variant/15">
+<div class="flex items-center gap-6">
+<h2 class="font-headline text-2xl font-bold text-primary tracking-tight">Mission Control</h2>
+<div class="h-4 w-[1px] bg-outline-variant/30"></div>
+<div class="flex items-center gap-4">
+<div class="flex flex-col">
+<span class="label-micro text-[9px] text-on-surface-variant">Active Missions</span>
+<span class="text-sm font-bold">12</span>
+</div>
+<div class="flex flex-col">
+<span class="label-micro text-[9px] text-on-surface-variant">Queued</span>
+<span class="text-sm font-bold">04</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative">
+<input class="bg-surface-container-low border-none text-xs py-1.5 pl-8 pr-4 w-64 focus:ring-1 focus:ring-primary" placeholder="Search Ledgers..." type="text"/>
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-sm text-outline" data-icon="search">search</span>
+</div>
+<div class="flex items-center gap-3 text-primary/70">
+<button class="hover:text-black transition-colors"><span class="material-symbols-outlined" data-icon="notifications">notifications</span></button>
+<button class="hover:text-black transition-colors"><span class="material-symbols-outlined" data-icon="terminal">terminal</span></button>
+<button class="hover:text-black transition-colors"><span class="material-symbols-outlined" data-icon="help_outline">help_outline</span></button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pl-64 pt-16 min-h-screen">
+<div class="max-w-7xl mx-auto p-8 grid grid-cols-12 gap-8">
+<!-- Left Column: Form Sections -->
+<div class="col-span-8 space-y-8">
+<!-- Page Intent Header -->
+<section>
+<h3 class="font-headline text-4xl font-bold tracking-tight">Draft Mission Brief</h3>
+<p class="font-headline italic text-on-surface-variant mt-1 text-lg">Define parameters and evidence requirements for the current ledger entry.</p>
+</section>
+<!-- Environment & Target -->
+<div class="grid grid-cols-2 gap-6 bg-surface-container-lowest p-6 border border-outline-variant/15">
+<div class="col-span-2 ruled-divider pb-2 mb-2 flex justify-between items-center">
+<span class="label-micro text-primary">01 // Environment &amp; Target</span>
+<span class="text-[10px] text-on-surface-variant/50">ARCHIVAL REF: ENV_409</span>
+</div>
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Environment</label>
+<select class="w-full border-none bg-surface-container-low text-sm px-3 py-2 focus:ring-2 focus:ring-primary">
+<option>Production (Live)</option>
+<option>Staging</option>
+<option>Beta-Test</option>
+<option>Local Dev</option>
+</select>
+</div>
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Target URL</label>
+<input class="w-full border-none bg-surface-container-low text-sm px-3 py-2 focus:ring-2 focus:ring-primary" placeholder="https://app.ledger.com/..." type="text"/>
+</div>
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Feature Area</label>
+<input class="w-full border-none bg-surface-container-low text-sm px-3 py-2 focus:ring-2 focus:ring-primary" placeholder="Identity &amp; Auth" type="text"/>
+</div>
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Build Version</label>
+<input class="w-full border-none bg-surface-container-low text-sm px-3 py-2 focus:ring-2 focus:ring-primary" placeholder="v2.4.11-rc2" type="text"/>
+</div>
+</div>
+<!-- Execution Parameters -->
+<div class="bg-surface-container-lowest p-6 border border-outline-variant/15 space-y-6">
+<div class="ruled-divider pb-2 flex justify-between items-center">
+<span class="label-micro text-primary">02 // Execution Parameters</span>
+</div>
+<div class="grid grid-cols-3 gap-6">
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Browser/Device</label>
+<select class="w-full border-none bg-surface-container-low text-sm px-3 py-2 focus:ring-2 focus:ring-primary">
+<option>Chrome (Headless)</option>
+<option>Firefox (Gecko)</option>
+<option>Safari (Mobile)</option>
+<option>Edge (Chromium)</option>
+</select>
+</div>
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Browser Visibility</label>
+<div class="flex gap-2">
+<button class="flex-1 py-2 text-xs border border-primary bg-primary text-on-primary font-medium">Headless</button>
+<button class="flex-1 py-2 text-xs border border-outline-variant/30 hover:bg-surface-container-high transition-colors">Visible</button>
+</div>
+</div>
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Risk Level</label>
+<div class="flex items-center px-3 py-2 bg-surface-container-low gap-2">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="text-xs font-bold uppercase tracking-wider">Elevated Risk</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Mode Selector</label>
+<div class="grid grid-cols-2 gap-1 bg-surface-container-low p-1">
+<button class="p-2 text-[10px] font-bold uppercase bg-white shadow-sm">Execute Steps</button>
+<button class="p-2 text-[10px] font-bold uppercase opacity-50 hover:opacity-100 transition-opacity">Exploratory</button>
+<button class="p-2 text-[10px] font-bold uppercase opacity-50 hover:opacity-100 transition-opacity">Generate Scenarios</button>
+<button class="p-2 text-[10px] font-bold uppercase opacity-50 hover:opacity-100 transition-opacity">Regression Run</button>
+</div>
+</div>
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<label class="label-micro text-on-surface-variant">Safe Mode</label>
+<div class="w-8 h-4 bg-outline-variant/30 rounded-full relative">
+<div class="absolute left-1 top-1 w-2 h-2 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Timebox (Minutes)</label>
+<input class="w-full border-none bg-surface-container-low text-sm px-3 py-2 focus:ring-2 focus:ring-primary" type="number" value="15"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Step Definition -->
+<div class="bg-surface-container-lowest p-6 border border-outline-variant/15 space-y-4">
+<div class="ruled-divider pb-2 flex justify-between items-center">
+<span class="label-micro text-primary">03 // Mission Logic</span>
+</div>
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Testing Objective</label>
+<input class="w-full border-none border-b-2 border-outline-variant/15 bg-transparent text-lg font-headline italic py-2 focus:border-primary focus:ring-0 transition-colors" placeholder="Validate MFA challenge flow for privileged users" type="text"/>
+</div>
+<div class="grid grid-cols-1 gap-6">
+<div class="space-y-2">
+<div class="flex justify-between items-end">
+<label class="label-micro text-on-surface-variant">Plain-text Steps</label>
+<span class="text-[10px] text-on-surface-variant/50">SUPPORTS NATURAL LANGUAGE PARSING</span>
+</div>
+<textarea class="w-full border-none bg-surface-container-low p-4 text-sm font-mono leading-relaxed focus:ring-1 focus:ring-primary" placeholder="1. Navigate to /login
+2. Input {{CRED_EMAIL}} into 'Email'
+3. Click 'Next'
+4. Verify 'Password' field is visible" rows="6"></textarea>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Expected Outcomes</label>
+<textarea class="w-full border-none bg-surface-container-low p-3 text-xs focus:ring-1 focus:ring-primary" placeholder="MFA code requested, session token granted..." rows="2"></textarea>
+</div>
+<div class="space-y-2">
+<label class="label-micro text-on-surface-variant">Preconditions</label>
+<textarea class="w-full border-none bg-surface-container-low p-3 text-xs focus:ring-1 focus:ring-primary" placeholder="User has MFA enabled, no active cookies..." rows="2"></textarea>
+</div>
+</div>
+</div>
+<!-- Warnings -->
+<div class="bg-error/5 border-l-4 border-error p-6 flex gap-4">
+<span class="material-symbols-outlined text-error" data-icon="report">report</span>
+<div>
+<h4 class="text-xs font-bold uppercase tracking-tight text-error">Risky Configuration Detected</h4>
+<p class="text-xs mt-1 text-on-error-container leading-relaxed">
+                            Mission is set to <strong class="font-bold">Visible Browser</strong> using <strong class="font-bold">Production Credentials</strong> on a <strong class="font-bold">Live Target</strong>. 
+                            Unauthorized screen capture or interaction during execution may leak sensitive metadata. Safe Mode is currently disabled.
+                        </p>
+</div>
+</div>
+</div>
+<!-- Right Column: Insights & Controls -->
+<div class="col-span-4 space-y-6">
+<!-- Action Center -->
+<div class="bg-primary text-on-primary p-6 shadow-xl space-y-4">
+<div class="flex justify-between items-center mb-2">
+<span class="label-micro opacity-70">Mission Controls</span>
+<span class="material-symbols-outlined text-sm" data-icon="lock_open">lock_open</span>
+</div>
+<button class="w-full bg-on-primary text-primary font-bold py-3 text-sm flex items-center justify-center gap-2 hover:bg-white active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-lg" data-icon="rocket_launch">rocket_launch</span>
+                        Create Run
+                    </button>
+<div class="grid grid-cols-2 gap-2">
+<button class="bg-white/10 hover:bg-white/20 py-2.5 text-[10px] font-bold uppercase transition-colors">Parse Steps</button>
+<button class="bg-white/10 hover:bg-white/20 py-2.5 text-[10px] font-bold uppercase transition-colors">Auto-Gen</button>
+</div>
+<div class="ruled-divider border-white/10 pt-4">
+<button class="w-full text-left text-[10px] font-bold uppercase opacity-60 hover:opacity-100 flex items-center gap-2 py-1">
+<span class="material-symbols-outlined text-sm" data-icon="save">save</span>
+                            Save As Library
+                        </button>
+<button class="w-full text-left text-[10px] font-bold uppercase opacity-60 hover:opacity-100 flex items-center gap-2 py-1">
+<span class="material-symbols-outlined text-sm" data-icon="update">update</span>
+                            Update Existing
+                        </button>
+</div>
+</div>
+<!-- Scenario Generation Panel -->
+<div class="bg-surface-container-low p-6 border border-outline-variant/15 space-y-4">
+<div class="flex justify-between items-center">
+<span class="label-micro text-on-surface-variant">Coverage Matrix</span>
+<span class="bg-surface-container-highest px-2 py-0.5 label-micro !text-[9px]">4 Scenarios</span>
+</div>
+<div class="space-y-3">
+<!-- Scenario Card 1 -->
+<div class="bg-surface-container-lowest p-3 border-l-2 border-tertiary">
+<div class="flex justify-between items-start mb-1">
+<h5 class="text-xs font-bold leading-tight">MFA Token Expiry</h5>
+<span class="bg-tertiary/10 text-tertiary px-1.5 py-0.5 text-[8px] font-bold uppercase">Med Risk</span>
+</div>
+<p class="text-[10px] text-on-surface-variant line-clamp-2">Test behavior when user inputs token after 5 min window...</p>
+</div>
+<!-- Scenario Card 2 -->
+<div class="bg-surface-container-lowest p-3 border-l-2 border-error">
+<div class="flex justify-between items-start mb-1">
+<h5 class="text-xs font-bold leading-tight">Brute Force Lockout</h5>
+<span class="bg-error/10 text-error px-1.5 py-0.5 text-[8px] font-bold uppercase">High Risk</span>
+</div>
+<p class="text-[10px] text-on-surface-variant line-clamp-2">Attempt 10 failed logins; verify 15 min account suspension...</p>
+</div>
+<!-- Scenario Card 3 -->
+<div class="bg-surface-container-lowest p-3 border-l-2 border-primary">
+<div class="flex justify-between items-start mb-1">
+<h5 class="text-xs font-bold leading-tight">Happy Path MFA</h5>
+<span class="bg-primary/10 text-primary px-1.5 py-0.5 text-[8px] font-bold uppercase">Nominal</span>
+</div>
+<p class="text-[10px] text-on-surface-variant line-clamp-2">Successful login with valid SMS-based challenge code...</p>
+</div>
+</div>
+<button class="w-full py-2 border border-outline-variant/30 text-[10px] font-bold uppercase text-on-surface-variant hover:bg-white transition-colors">
+                        View Full Matrix
+                    </button>
+</div>
+<!-- Parse Preview -->
+<div class="bg-white p-6 border border-outline-variant/15 shadow-sm">
+<span class="label-micro text-on-surface-variant block mb-4">Live Parse Preview</span>
+<div class="space-y-3 border-l-2 border-surface-container-high pl-4">
+<div class="flex gap-3">
+<span class="text-[10px] font-mono opacity-30 mt-0.5">01</span>
+<div>
+<span class="text-[10px] uppercase font-bold text-primary">Command:</span>
+<span class="text-[10px] block">navigate_to(url: "https://...")</span>
+</div>
+</div>
+<div class="flex gap-3">
+<span class="text-[10px] font-mono opacity-30 mt-0.5">02</span>
+<div>
+<span class="text-[10px] uppercase font-bold text-tertiary">Dynamic Value:</span>
+<span class="text-[10px] block font-mono bg-tertiary/5 p-1">fetch_credential(type: "email")</span>
+</div>
+</div>
+<div class="flex gap-3">
+<span class="text-[10px] font-mono opacity-30 mt-0.5">03</span>
+<div>
+<span class="text-[10px] uppercase font-bold text-primary">Action:</span>
+<span class="text-[10px] block">element_interact(selector: "Next", type: "click")</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Credential Reference -->
+<div class="p-6 bg-surface-container-low border border-outline-variant/15">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-sm opacity-50" data-icon="database">database</span>
+<span class="label-micro text-on-surface-variant">Active Credential Vault</span>
+</div>
+<div class="flex justify-between items-center bg-white p-2 border border-outline-variant/10">
+<span class="text-[10px] font-bold">QA_SECURE_VAULT_B</span>
+<button class="text-[9px] text-primary underline">Change</button>
+</div>
+<div class="mt-4 space-y-1">
+<div class="flex justify-between text-[10px]">
+<span class="text-on-surface-variant">Login Email</span>
+<span class="font-mono">tst_*****@ledger.qa</span>
+</div>
+<div class="flex justify-between text-[10px]">
+<span class="text-on-surface-variant">Role Mapping</span>
+<span class="font-bold">Privileged Operator</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer Meta -->
+<footer class="pl-64 py-8 border-t border-outline-variant/10 bg-surface-container-low">
+<div class="max-w-7xl mx-auto px-8 flex justify-between items-center opacity-50">
+<div class="flex gap-8">
+<span class="label-micro">System Status: Operational</span>
+<span class="label-micro">Version: 4.8.2-Stable</span>
+</div>
+<div class="label-micro italic">The Forensic Ledger is a sovereign QA instrument. All entries are immutable.</div>
+</div>
+</footer>
+</body></html>
