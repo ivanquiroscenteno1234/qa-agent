@@ -7,6 +7,7 @@ import { ActionBar } from "@/components/ui/action-bar";
 import { MetricCard } from "@/components/ui/metric-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { SectionFrame } from "@/components/ui/section-frame";
+import { getQaLlmConfig } from "@/lib/qa/llm/config";
 import { buildCredentialVaultCards, buildEnvironmentCards } from "@/lib/qa/settings-view-model";
 import { listRuns, listScenarioLibraries } from "@/lib/qa/store";
 
@@ -19,6 +20,7 @@ export async function SettingsScreen({ storeBackendLabel = "json" }: SettingsScr
   const credentialCards = buildCredentialVaultCards(runs);
   const environmentCards = buildEnvironmentCards(runs, libraries);
   const inlineCredentialRunCount = runs.filter((run) => Boolean(run.plan.loginEmail || run.plan.loginPassword)).length;
+  const llmConfig = getQaLlmConfig();
 
   return (
     <AppShell
@@ -48,6 +50,7 @@ export async function SettingsScreen({ storeBackendLabel = "json" }: SettingsScr
       topBarUtilities={
         <>
           <span className="app-utility-chip">No vault backend</span>
+          <span className="app-utility-chip">{llmConfig.statusLabel}</span>
           <span className="app-utility-chip">Store: {storeBackendLabel.toUpperCase()}</span>
         </>
       }
@@ -71,9 +74,23 @@ export async function SettingsScreen({ storeBackendLabel = "json" }: SettingsScr
       <section className="metric-grid">
         <MetricCard label="Run Records" value={String(runs.length)} detail={`Stored in ${storeBackendLabel.toUpperCase()} run store`} tone="running" />
         <MetricCard label="Scenario Libraries" value={String(libraries.length)} detail={`Stored in ${storeBackendLabel.toUpperCase()} library store`} />
+        <MetricCard label="LLM Provider" value={llmConfig.provider.toUpperCase()} detail={llmConfig.detail} tone={llmConfig.configured ? "success" : "warning"} />
         <MetricCard label="Credential References" value={String(credentialCards.length)} detail="Observed from saved plans, not from a vault index" tone="warning" />
         <MetricCard label="Inline Secret Risk" value={String(inlineCredentialRunCount)} detail="Runs with direct email or password plan input" tone={inlineCredentialRunCount ? "warning" : "success"} />
       </section>
+
+      <SectionFrame eyebrow="Model Provider" title="Gemini Configuration" reference={llmConfig.statusLabel}>
+        <ul>
+          <li>{llmConfig.detail}</li>
+          <li>Provider: {llmConfig.provider === "disabled" ? "none" : llmConfig.provider}</li>
+          <li>Model: {llmConfig.model}</li>
+          <li>API key present: {llmConfig.apiKeyPresent ? "Yes" : "No"}</li>
+          <li>Step parsing: {llmConfig.features.stepParsing ? "Enabled" : "Disabled"}</li>
+          <li>Scenario generation: {llmConfig.features.scenarioGeneration ? "Enabled" : "Disabled"}</li>
+          <li>Review analysis: {llmConfig.features.reviewAnalysis ? "Enabled" : "Disabled"}</li>
+          {llmConfig.warning ? <li>{llmConfig.warning}</li> : null}
+        </ul>
+      </SectionFrame>
 
       <SectionFrame eyebrow="Credential Handling" title="Credential Posture" reference={`${credentialCards.length} observed profiles`}>
         <div className="settings-grid">
