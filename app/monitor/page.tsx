@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { QaCommandCenter } from "@/components/qa-command-center";
 import { getQaStoreBackendKind } from "@/lib/qa/storage/backend";
@@ -9,5 +10,9 @@ export const metadata: Metadata = {
 };
 
 export default function MonitorPage() {
-  return <QaCommandCenter initialWorkflowView="monitor" storeBackendLabel={getQaStoreBackendKind()} />;
+  return (
+    <Suspense fallback={null}>
+      <QaCommandCenter initialWorkflowView="monitor" storeBackendLabel={getQaStoreBackendKind()} />
+    </Suspense>
+  );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { QaCommandCenter } from "@/components/qa-command-center";
 
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function DraftPage() {
-  return <QaCommandCenter initialWorkflowView="draft" />;
+  return (
+    <Suspense fallback={null}>
+      <QaCommandCenter initialWorkflowView="draft" />
+    </Suspense>
+  );
 }
