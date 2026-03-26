@@ -84,8 +84,6 @@ Create these saved records first so later scenarios can reuse them.
 ### Seed Credential Profile
 
 - Credential Profile Label: `Restaurant Partner Admin`
-- Username: `ivanquiroscenteno@gmail.com`
-- Password: `zxcvFDSAqwer1234@`
 - Secret Mode: `stored-secret`
 - Status: `active`
 - Reference: optional
