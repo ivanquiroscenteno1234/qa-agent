@@ -1,4 +1,6 @@
 import type {
+  CredentialLibraryRecord,
+  EnvironmentLibraryRecord,
   GenerateScenariosResponse,
   ParseStepsResponse,
   QaMode,
@@ -14,8 +16,26 @@ interface DraftWorkflowViewProps {
   plan: RunPlan;
   parsePreview: ParseStepsResponse | null;
   scenarioPreview: GenerateScenariosResponse | null;
+  invalidFields: {
+    targetUrl: boolean;
+    stepsText: boolean;
+    scenarioLibraryId: boolean;
+    inlineCredentials: boolean;
+  };
+  parseDisabledReason: string | null;
+  parseValidationMessages: string[];
+  createRunDisabledReason: string | null;
+  createRunValidationMessages: string[];
+  generateScenariosDisabledReason: string | null;
+  generateScenarioValidationMessages: string[];
+  environmentLibraries: EnvironmentLibraryRecord[];
+  credentialLibraries: CredentialLibraryRecord[];
   scenarioLibraries: ScenarioLibrary[];
+  selectedEnvironmentLibrary: EnvironmentLibraryRecord | null;
+  selectedCredentialLibrary: CredentialLibraryRecord | null;
   selectedScenarioLibrary: ScenarioLibrary | null;
+  environmentLibraryName: string;
+  credentialLibraryName: string;
   scenarioLibraryName: string;
   planWarnings: string[];
   feedback: string;
@@ -23,11 +43,19 @@ interface DraftWorkflowViewProps {
   modeLabels: Record<QaMode, string>;
   riskOptions: RiskLevel[];
   onPlanChange: <Key extends keyof RunPlan>(key: Key, value: RunPlan[Key]) => void;
+  onEnvironmentLibraryNameChange: (value: string) => void;
+  onCredentialLibraryNameChange: (value: string) => void;
   onScenarioLibraryNameChange: (value: string) => void;
+  onSelectEnvironmentLibrary: (environmentLibraryId: string) => void;
+  onSelectCredentialLibrary: (credentialLibraryId: string) => void;
   onSelectScenarioLibrary: (scenarioLibraryId: string) => void;
   onParse: () => void;
   onGenerateScenarios: () => void;
   onCreateRun: () => void;
+  onSaveEnvironmentLibrary: () => void;
+  onUpdateEnvironmentLibrary: () => void;
+  onSaveCredentialLibrary: () => void;
+  onUpdateCredentialLibrary: () => void;
   onSaveAsLibrary: () => void;
   onUpdateLibrary: () => void;
 }
@@ -36,8 +64,21 @@ export function DraftWorkflowView({
   plan,
   parsePreview,
   scenarioPreview,
+  invalidFields,
+  parseDisabledReason,
+  parseValidationMessages,
+  createRunDisabledReason,
+  createRunValidationMessages,
+  generateScenariosDisabledReason,
+  generateScenarioValidationMessages,
+  environmentLibraries,
+  credentialLibraries,
   scenarioLibraries,
+  selectedEnvironmentLibrary,
+  selectedCredentialLibrary,
   selectedScenarioLibrary,
+  environmentLibraryName,
+  credentialLibraryName,
   scenarioLibraryName,
   planWarnings,
   feedback,
@@ -45,14 +86,25 @@ export function DraftWorkflowView({
   modeLabels,
   riskOptions,
   onPlanChange,
+  onEnvironmentLibraryNameChange,
+  onCredentialLibraryNameChange,
   onScenarioLibraryNameChange,
+  onSelectEnvironmentLibrary,
+  onSelectCredentialLibrary,
   onSelectScenarioLibrary,
   onParse,
   onGenerateScenarios,
   onCreateRun,
+  onSaveEnvironmentLibrary,
+  onUpdateEnvironmentLibrary,
+  onSaveCredentialLibrary,
+  onUpdateCredentialLibrary,
   onSaveAsLibrary,
   onUpdateLibrary
 }: DraftWorkflowViewProps) {
+  const targetUrlRequired = true;
+  const stepsRequired = plan.mode === "execute-steps" || plan.mode === "execute-and-expand";
+  const scenarioLibraryRequired = plan.mode === "regression-run";
   const missionReference = buildMissionReference(plan);
   const selectedLibraryVersions = selectedScenarioLibrary?.versions ?? [];
   const selectedLibraryVersion = selectedScenarioLibrary?.version ?? (selectedLibraryVersions.length || 1);
@@ -70,11 +122,49 @@ export function DraftWorkflowView({
     : !scenarioLibraryName.trim()
       ? "Provide a library name first."
       : null;
+  const saveEnvironmentDisabledReason = !environmentLibraryName.trim()
+    ? "Provide an environment profile name first."
+    : !plan.targetUrl.trim()
+      ? "Provide a target URL before saving an environment profile."
+      : invalidFields.targetUrl
+        ? "Provide a valid http:// or https:// target URL before saving an environment profile."
+      : null;
+  const updateEnvironmentDisabledReason = !selectedEnvironmentLibrary
+    ? "Select an existing environment profile to update it."
+    : invalidFields.targetUrl
+      ? "Provide a valid http:// or https:// target URL before updating the environment profile."
+    : null;
+  const saveCredentialDisabledReason = !credentialLibraryName.trim()
+    ? "Provide a credential profile label first."
+    : !(plan.loginEmail.trim() || selectedCredentialLibrary?.username)
+      ? "Provide a login email or username before saving a credential profile."
+      : !(plan.loginPassword.trim() || plan.credentialReference.trim() || selectedCredentialLibrary?.hasStoredSecret || selectedCredentialLibrary?.reference)
+        ? "Provide either a password or a credential reference handle."
+        : null;
+  const updateCredentialDisabledReason = !selectedCredentialLibrary
+    ? "Select an existing credential profile to update it."
+    : null;
   const updateDisabledReason = !selectedScenarioLibrary
     ? "Select an existing library to update it."
     : !hasScenarioSource
       ? "There are no scenarios available to write back yet."
       : null;
+
+  function renderLabel(text: string, required = false) {
+    return (
+      <span className="field-label-row">
+        <span>{text}</span>
+        {required ? <span className="field-required-badge">Required</span> : null}
+      </span>
+    );
+  }
+
+  function getControlProps(isInvalid: boolean) {
+    return {
+      className: isInvalid ? "field-control-invalid" : undefined,
+      "aria-invalid": isInvalid ? "true" : "false"
+    } as const;
+  }
 
   return (
     <section className="draft-screen">
@@ -82,35 +172,35 @@ export function DraftWorkflowView({
         <SectionFrame eyebrow="01 // Environment & Target" title="Mission Parameters" reference={missionReference}>
           <div className="field-grid two-up">
             <label>
-              Environment
+              {renderLabel("Environment")}
               <input value={plan.environment} onChange={(event) => onPlanChange("environment", event.target.value)} />
             </label>
             <label>
-              Target URL
-              <input value={plan.targetUrl} onChange={(event) => onPlanChange("targetUrl", event.target.value)} />
+              {renderLabel("Target URL", targetUrlRequired)}
+              <input {...getControlProps(invalidFields.targetUrl)} value={plan.targetUrl} onChange={(event) => onPlanChange("targetUrl", event.target.value)} />
             </label>
             <label>
-              Feature Area
+              {renderLabel("Feature Area")}
               <input value={plan.featureArea} onChange={(event) => onPlanChange("featureArea", event.target.value)} />
             </label>
             <label>
-              Build Version
+              {renderLabel("Build Version")}
               <input value={plan.buildVersion} onChange={(event) => onPlanChange("buildVersion", event.target.value)} />
             </label>
             <label>
-              Browser
+              {renderLabel("Browser")}
               <input value={plan.browser} onChange={(event) => onPlanChange("browser", event.target.value)} />
             </label>
             <label>
-              Device
+              {renderLabel("Device")}
               <input value={plan.device} onChange={(event) => onPlanChange("device", event.target.value)} />
             </label>
             <label>
-              Role
+              {renderLabel("Role")}
               <input value={plan.role} onChange={(event) => onPlanChange("role", event.target.value)} />
             </label>
             <label>
-              Credential Reference
+              {renderLabel("Credential Reference")}
               <input value={plan.credentialReference} onChange={(event) => onPlanChange("credentialReference", event.target.value)} />
             </label>
           </div>
@@ -119,7 +209,7 @@ export function DraftWorkflowView({
         <SectionFrame eyebrow="02 // Execution Parameters" title="Runtime Controls">
           <div className="field-grid two-up draft-parameter-grid">
             <label className="toggle-field">
-              Browser Visibility
+              {renderLabel("Browser Visibility")}
               <button
                 type="button"
                 className={`toggle ${plan.headless ? "" : "toggle-active"}`}
@@ -129,7 +219,7 @@ export function DraftWorkflowView({
               </button>
             </label>
             <label>
-              Mode
+              {renderLabel("Mode")}
               <select value={plan.mode} onChange={(event) => onPlanChange("mode", event.target.value as QaMode)}>
                 {Object.entries(modeLabels).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -139,7 +229,7 @@ export function DraftWorkflowView({
               </select>
             </label>
             <label>
-              Risk Level
+              {renderLabel("Risk Level")}
               <select value={plan.riskLevel} onChange={(event) => onPlanChange("riskLevel", event.target.value as RiskLevel)}>
                 {riskOptions.map((risk) => (
                   <option key={risk} value={risk}>
@@ -149,7 +239,7 @@ export function DraftWorkflowView({
               </select>
             </label>
             <label>
-              Timebox Minutes
+              {renderLabel("Timebox Minutes")}
               <input
                 type="number"
                 min={5}
@@ -159,7 +249,7 @@ export function DraftWorkflowView({
               />
             </label>
             <label className="toggle-field">
-              Safe Mode
+              {renderLabel("Safe Mode")}
               <button
                 type="button"
                 className={`toggle ${plan.safeMode ? "toggle-active" : ""}`}
@@ -173,13 +263,13 @@ export function DraftWorkflowView({
               <StatusBadge tone={plan.safeMode ? "success" : "warning"}>{plan.safeMode ? "Safe posture" : "Interactive posture"}</StatusBadge>
             </div>
             <label>
-              Login Email
-              <input value={plan.loginEmail} onChange={(event) => onPlanChange("loginEmail", event.target.value)} />
+              {renderLabel("Login Email")}
+              <input {...getControlProps(invalidFields.inlineCredentials)} value={plan.loginEmail} onChange={(event) => onPlanChange("loginEmail", event.target.value)} />
             </label>
             <label>
-              Login Password
-              <input type="password" value={plan.loginPassword} onChange={(event) => onPlanChange("loginPassword", event.target.value)} />
-              <small className="field-hint">Credentials in this MVP are stored locally. Use test-only accounts.</small>
+              {renderLabel("Login Password")}
+              <input {...getControlProps(invalidFields.inlineCredentials)} type="password" value={plan.loginPassword} onChange={(event) => onPlanChange("loginPassword", event.target.value)} />
+              <small className="field-hint">Saved credential profiles avoid storing passwords on new runs. Inline values override saved credentials.</small>
             </label>
           </div>
         </SectionFrame>
@@ -187,33 +277,33 @@ export function DraftWorkflowView({
         <SectionFrame eyebrow="03 // Mission Brief" title="Step Definition">
           <div className="field-grid">
             <label>
-              Testing Objective
+              {renderLabel("Testing Objective")}
               <textarea value={plan.objective} onChange={(event) => onPlanChange("objective", event.target.value)} rows={3} />
             </label>
             <label>
-              Plain-Text Steps
-              <textarea value={plan.stepsText} onChange={(event) => onPlanChange("stepsText", event.target.value)} rows={8} />
+              {renderLabel("Plain-Text Steps", stepsRequired)}
+              <textarea {...getControlProps(invalidFields.stepsText)} value={plan.stepsText} onChange={(event) => onPlanChange("stepsText", event.target.value)} rows={8} />
             </label>
             <div className="field-grid two-up">
               <label>
-                Expected Outcomes
+                {renderLabel("Expected Outcomes")}
                 <textarea value={plan.expectedOutcomes} onChange={(event) => onPlanChange("expectedOutcomes", event.target.value)} rows={3} />
               </label>
               <label>
-                Acceptance Criteria
+                {renderLabel("Acceptance Criteria")}
                 <textarea value={plan.acceptanceCriteria} onChange={(event) => onPlanChange("acceptanceCriteria", event.target.value)} rows={3} />
               </label>
               <label>
-                Preconditions
+                {renderLabel("Preconditions")}
                 <textarea value={plan.prerequisites} onChange={(event) => onPlanChange("prerequisites", event.target.value)} rows={2} />
               </label>
               <label>
-                Cleanup Instructions
+                {renderLabel("Cleanup Instructions")}
                 <textarea value={plan.cleanupInstructions} onChange={(event) => onPlanChange("cleanupInstructions", event.target.value)} rows={2} />
               </label>
             </div>
             <label>
-              Risk Focus
+              {renderLabel("Risk Focus")}
               <input
                 value={plan.riskFocus.join(", ")}
                 onChange={(event) =>
@@ -230,27 +320,164 @@ export function DraftWorkflowView({
           </div>
 
           <ActionBar>
-            <button type="button" onClick={onParse}>
+            <button type="button" onClick={onParse} disabled={Boolean(parseDisabledReason)}>
               Parse Steps
             </button>
-            <button type="button" onClick={onGenerateScenarios}>
+            <button type="button" onClick={onGenerateScenarios} disabled={Boolean(generateScenariosDisabledReason)}>
               Generate Scenarios
             </button>
-            <button type="button" className="primary-action" onClick={onCreateRun}>
+            <button type="button" className="primary-action" onClick={onCreateRun} disabled={Boolean(createRunDisabledReason)}>
               Create Run
             </button>
           </ActionBar>
 
+          <div className="draft-inline-notes">
+            <p className="muted">Minimum to create a run: Target URL. Some modes also require plain-text steps or a saved scenario library.</p>
+            {parseDisabledReason ? <p className="muted">Parse Steps: {parseDisabledReason}</p> : null}
+            {generateScenariosDisabledReason ? <p className="muted">Generate Scenarios: {generateScenariosDisabledReason}</p> : null}
+            {createRunDisabledReason ? <p className="muted">Create Run: {createRunDisabledReason}</p> : null}
+          </div>
+
           <p className="feedback-banner">{feedback}</p>
+
+          {!!parseValidationMessages.length && (
+            <div className="callout-grid draft-single-callout">
+              <div className="callout-box warning-box">
+                <h3>Required Before Step Parsing</h3>
+                <ul>
+                  {parseValidationMessages.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {!!createRunValidationMessages.length && (
+            <div className="callout-grid draft-single-callout">
+              <div className="callout-box warning-box">
+                <h3>Required Before Run Creation</h3>
+                <ul>
+                  {createRunValidationMessages.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {!!generateScenarioValidationMessages.length && (
+            <div className="callout-grid draft-single-callout">
+              <div className="callout-box warning-box">
+                <h3>Required Before Scenario Generation</h3>
+                <ul>
+                  {generateScenarioValidationMessages.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
         </SectionFrame>
       </div>
 
       <div className="draft-secondary-column">
-        <SectionFrame eyebrow="04 // Scenario Source" title="Library Control" reference={`SCENARIOS: ${scenarioCount}`}>
+        <SectionFrame eyebrow="04 // Saved Profiles" title="Environment & Credential Profiles" reference={`${environmentLibraries.length} env · ${credentialLibraries.length} cred`}>
           <div className="field-grid">
             <label>
-              Saved Scenario Library
-              <select value={plan.scenarioLibraryId ?? ""} onChange={(event) => onSelectScenarioLibrary(event.target.value)}>
+              Saved Environment Profile
+              <select value={plan.environmentLibraryId ?? ""} onChange={(event) => onSelectEnvironmentLibrary(event.target.value)}>
+                <option value="">None selected</option>
+                {environmentLibraries.map((library) => (
+                  <option key={library.id} value={library.id}>
+                    {library.name} · {library.targetUrl}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Environment Profile Name
+              <input value={environmentLibraryName} onChange={(event) => onEnvironmentLibraryNameChange(event.target.value)} />
+            </label>
+            <label>
+              Saved Credential Profile
+              <select value={plan.credentialLibraryId ?? ""} onChange={(event) => onSelectCredentialLibrary(event.target.value)}>
+                <option value="">None selected</option>
+                {credentialLibraries.map((library) => (
+                  <option key={library.id} value={library.id}>
+                    {library.label} · {library.username}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Credential Profile Label
+              <input value={credentialLibraryName} onChange={(event) => onCredentialLibraryNameChange(event.target.value)} />
+            </label>
+          </div>
+
+          <ActionBar>
+            <button type="button" onClick={onSaveEnvironmentLibrary} disabled={Boolean(saveEnvironmentDisabledReason)}>
+              Save Environment
+            </button>
+            <button type="button" onClick={onUpdateEnvironmentLibrary} disabled={Boolean(updateEnvironmentDisabledReason)}>
+              Update Environment
+            </button>
+            <button type="button" onClick={onSaveCredentialLibrary} disabled={Boolean(saveCredentialDisabledReason)}>
+              Save Credential
+            </button>
+            <button type="button" onClick={onUpdateCredentialLibrary} disabled={Boolean(updateCredentialDisabledReason)}>
+              Update Credential
+            </button>
+          </ActionBar>
+
+          <div className="draft-inline-notes">
+            {saveEnvironmentDisabledReason ? <p className="muted">Save Environment: {saveEnvironmentDisabledReason}</p> : null}
+            {updateEnvironmentDisabledReason ? <p className="muted">Update Environment: {updateEnvironmentDisabledReason}</p> : null}
+            {saveCredentialDisabledReason ? <p className="muted">Save Credential: {saveCredentialDisabledReason}</p> : null}
+            {updateCredentialDisabledReason ? <p className="muted">Update Credential: {updateCredentialDisabledReason}</p> : null}
+            <p className="muted">Inline email and password values override the selected saved credential during execution.</p>
+          </div>
+
+          {selectedEnvironmentLibrary ? (
+            <div className="callout-grid draft-single-callout">
+              <div className="callout-box">
+                <h3>Selected Environment Profile</h3>
+                <ul>
+                  <li>{selectedEnvironmentLibrary.name}</li>
+                  <li>Target: {selectedEnvironmentLibrary.targetUrl}</li>
+                  <li>Role: {selectedEnvironmentLibrary.role || "Not set"}</li>
+                  <li>Browser: {selectedEnvironmentLibrary.browser}</li>
+                  <li>Device: {selectedEnvironmentLibrary.device}</li>
+                  <li>Risk: {selectedEnvironmentLibrary.riskLevel}</li>
+                  <li>Default credential: {selectedEnvironmentLibrary.defaultCredentialId ? "Linked" : "None"}</li>
+                </ul>
+              </div>
+            </div>
+          ) : null}
+
+          {selectedCredentialLibrary ? (
+            <div className="callout-grid draft-single-callout">
+              <div className="callout-box">
+                <h3>Selected Credential Profile</h3>
+                <ul>
+                  <li>{selectedCredentialLibrary.label}</li>
+                  <li>User: {selectedCredentialLibrary.username}</li>
+                  <li>Mode: {selectedCredentialLibrary.secretMode}</li>
+                  <li>Status: {selectedCredentialLibrary.status}</li>
+                  <li>Stored secret: {selectedCredentialLibrary.hasStoredSecret ? "Yes" : "No"}</li>
+                  <li>Reference: {selectedCredentialLibrary.reference ?? "Not set"}</li>
+                </ul>
+              </div>
+            </div>
+          ) : null}
+        </SectionFrame>
+
+        <SectionFrame eyebrow="05 // Scenario Source" title="Library Control" reference={`SCENARIOS: ${scenarioCount}`}>
+          <div className="field-grid">
+            <label>
+              {renderLabel("Saved Scenario Library", scenarioLibraryRequired)}
+              <select {...getControlProps(invalidFields.scenarioLibraryId)} value={plan.scenarioLibraryId ?? ""} onChange={(event) => onSelectScenarioLibrary(event.target.value)}>
                 <option value="">None selected</option>
                 {scenarioLibraries.map((library) => (
                   <option key={library.id} value={library.id}>
@@ -260,7 +487,7 @@ export function DraftWorkflowView({
               </select>
             </label>
             <label>
-              Library Name
+              {renderLabel("Library Name")}
               <input value={scenarioLibraryName} onChange={(event) => onScenarioLibraryNameChange(event.target.value)} />
             </label>
           </div>
@@ -311,84 +538,84 @@ export function DraftWorkflowView({
           )}
         </SectionFrame>
 
-        <SectionFrame eyebrow="05 // Parse Preview" title="Interpretation" reference={`PARSED: ${parseStepCount}`}>
+        <SectionFrame eyebrow="06 // Parse Preview" title="Interpretation" reference={`PARSED: ${parseStepCount}`}>
           <div className="list-block">
-          {(parsePreview?.parsedSteps ?? []).map((step) => (
-            <article key={step.id} className="list-card">
-              <header>
-                <strong>{step.actionType}</strong>
-                <span>{step.riskClassification}</span>
-              </header>
-              <p>{step.rawText}</p>
-              <small>Target: {step.targetDescription}</small>
-            </article>
-          ))}
-          {parsePreview && !parsePreview.parsedSteps.length && (
-            <p className="muted">No explicit steps were provided. This is valid for discovery-first exploratory runs.</p>
-          )}
-          {!parsePreview && <p className="muted">Parse the natural-language steps to review the structured action plan.</p>}
+            {(parsePreview?.parsedSteps ?? []).map((step) => (
+              <article key={step.id} className="list-card">
+                <header>
+                  <strong>{step.actionType}</strong>
+                  <span>{step.riskClassification}</span>
+                </header>
+                <p>{step.rawText}</p>
+                <small>Target: {step.targetDescription}</small>
+              </article>
+            ))}
+            {parsePreview && !parsePreview.parsedSteps.length && (
+              <p className="muted">No explicit steps were provided. This is valid for discovery-first exploratory runs.</p>
+            )}
+            {!parsePreview && <p className="muted">Parse the natural-language steps to review the structured action plan.</p>}
           </div>
 
           {parsePreview && (
-          <div className="callout-grid">
-            <div className="callout-box">
-              <h3>Assumptions</h3>
-              <ul>
-                {parsePreview.assumptions.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-                {!parsePreview.assumptions.length && <li>No assumptions added.</li>}
-              </ul>
+            <div className="callout-grid">
+              <div className="callout-box">
+                <h3>Assumptions</h3>
+                <ul>
+                  {parsePreview.assumptions.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                  {!parsePreview.assumptions.length && <li>No assumptions added.</li>}
+                </ul>
+              </div>
+              <div className="callout-box warning-box">
+                <h3>Ambiguities</h3>
+                <ul>
+                  {parsePreview.ambiguities.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                  {!parsePreview.ambiguities.length && <li>No ambiguities detected.</li>}
+                </ul>
+              </div>
             </div>
-            <div className="callout-box warning-box">
-              <h3>Ambiguities</h3>
-              <ul>
-                {parsePreview.ambiguities.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-                {!parsePreview.ambiguities.length && <li>No ambiguities detected.</li>}
-              </ul>
-            </div>
-          </div>
           )}
         </SectionFrame>
 
-        <SectionFrame eyebrow="06 // Scenario Studio" title="QA Coverage Matrix" reference={`SCENARIOS: ${scenarioCount}`}>
+        <SectionFrame eyebrow="07 // Scenario Studio" title="QA Coverage Matrix" reference={`SCENARIOS: ${scenarioCount}`}>
           <div className="list-block scenario-list">
-          {(scenarioPreview?.scenarios ?? []).map((scenario) => (
-            <article key={scenario.id} className="list-card">
-              <header>
-                <strong>{scenario.title}</strong>
-                <span>
-                  {scenario.priority} · {scenario.type}
-                </span>
-              </header>
-              <p>{scenario.expectedResult}</p>
-              <small>{scenario.riskRationale}</small>
-            </article>
-          ))}
-          {!scenarioPreview && <p className="muted">Generate QA scenarios to see coverage beyond the happy path.</p>}
+            {(scenarioPreview?.scenarios ?? []).map((scenario) => (
+              <article key={scenario.id} className="list-card">
+                <header>
+                  <strong>{scenario.title}</strong>
+                  <span>
+                    {scenario.priority} · {scenario.type}
+                  </span>
+                </header>
+                <p>{scenario.expectedResult}</p>
+                <small>{scenario.riskRationale}</small>
+              </article>
+            ))}
+            {!scenarioPreview && <p className="muted">Generate QA scenarios to see coverage beyond the happy path.</p>}
           </div>
 
           {scenarioPreview && (
-          <div className="callout-grid">
-            <div className="callout-box">
-              <h3>Risk Summary</h3>
-              <ul>
-                {scenarioPreview.riskSummary.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
+            <div className="callout-grid">
+              <div className="callout-box">
+                <h3>Risk Summary</h3>
+                <ul>
+                  {scenarioPreview.riskSummary.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="callout-box warning-box">
+                <h3>Coverage Gaps</h3>
+                <ul>
+                  {scenarioPreview.coverageGaps.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
-            <div className="callout-box warning-box">
-              <h3>Coverage Gaps</h3>
-              <ul>
-                {scenarioPreview.coverageGaps.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
           )}
         </SectionFrame>
       </div>

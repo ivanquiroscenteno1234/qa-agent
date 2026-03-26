@@ -1,5 +1,6 @@
 import { chromium, firefox, webkit, type Locator, type Page } from "playwright";
 
+import { hasCredentialSource } from "@/lib/qa/auth-session";
 import type { ParsedStep, RunPlan } from "@/lib/types";
 
 type ExecutionOutcome = { observedTarget: string; actionResult: string; notes: string };
@@ -322,8 +323,7 @@ export async function runStep(
   if (
     step.actionType !== "navigate" &&
     step.actionType !== "login" &&
-    plan.loginEmail &&
-    plan.loginPassword &&
+    hasCredentialSource(plan) &&
     (await deps.pageHasLoginForm(page))
   ) {
     await deps.executeLogin(page, parsedSteps, plan);

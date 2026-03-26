@@ -33,6 +33,10 @@ export type FailureCategory =
 
 export type RiskLevel = "low" | "moderate" | "high";
 
+export type CredentialSecretMode = "stored-secret" | "reference-only";
+
+export type CredentialStatus = "active" | "revoked";
+
 export type ActionType =
   | "navigate"
   | "login"
@@ -204,6 +208,8 @@ export interface RunPlan {
   device: string;
   headless: boolean;
   role: string;
+  environmentLibraryId?: string;
+  credentialLibraryId?: string;
   credentialReference: string;
   loginEmail: string;
   loginPassword: string;
@@ -218,6 +224,53 @@ export interface RunPlan {
   cleanupInstructions: string;
   acceptanceCriteria: string;
   riskFocus: string[];
+}
+
+export interface EnvironmentLibraryInput {
+  name: string;
+  targetUrl: string;
+  environment: string;
+  role: string;
+  browser: string;
+  device: string;
+  safeMode: boolean;
+  riskLevel: RiskLevel;
+  defaultCredentialId?: string;
+  notes: string;
+}
+
+export interface EnvironmentLibraryRecord extends EnvironmentLibraryInput {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CredentialLibraryInput {
+  label: string;
+  username: string;
+  password?: string;
+  secretMode: CredentialSecretMode;
+  reference?: string;
+  status: CredentialStatus;
+  notes: string;
+}
+
+export interface CredentialLibraryRecord {
+  id: string;
+  label: string;
+  username: string;
+  secretMode: CredentialSecretMode;
+  reference?: string;
+  hasStoredSecret: boolean;
+  status: CredentialStatus;
+  notes: string;
+  lastUsedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StoredCredentialLibraryRecord extends Omit<CredentialLibraryRecord, "hasStoredSecret"> {
+  password?: string;
 }
 
 export interface RunRecord {

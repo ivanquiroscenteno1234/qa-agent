@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "install:ignore-scripts": "npm install --ignore-scripts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "sqlite:rebuild": "node scripts/rebuild-sqlite-store.mjs"
+    "sqlite:rebuild": "node scripts/rebuild-sqlite-store.mjs",
+    "verify:credential-secrets": "node scripts/verify-credential-secrets.mjs"
   },
   "dependencies": {
     "@types/better-sqlite3": "^7.6.13",

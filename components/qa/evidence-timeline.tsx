@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import type { Artifact, ParsedStep, StepResult } from "@/lib/types";
 
 interface TimelineItem {
@@ -65,10 +67,13 @@ export function EvidenceTimeline({ runId, stepResults, parsedSteps, artifacts }:
               ) : null}
             </div>
             {item.screenshotArtifact ? (
-              <img
+              <Image
                 className="timeline-evidence-image"
                 src={`/api/runs/${runId}/artifacts/${item.screenshotArtifact.id}`}
                 alt={item.screenshotArtifact.label}
+                width={1200}
+                height={675}
+                sizes="(max-width: 1100px) 100vw, 220px"
               />
             ) : null}
           </div>

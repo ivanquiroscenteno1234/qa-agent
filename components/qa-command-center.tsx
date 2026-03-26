@@ -10,9 +10,16 @@ import { AppShell } from "@/components/layout/app-shell";
 import { MetricCard } from "@/components/ui/metric-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { buildRunPlanWarnings } from "@/lib/qa/plan-validation";
+import {
+  buildRunPlanWarnings,
+  getParseValidationErrors,
+  getRunPlanValidationErrors,
+  getScenarioGenerationValidationErrors
+} from "@/lib/qa/plan-validation";
 
 import type {
+  CredentialLibraryRecord,
+  EnvironmentLibraryRecord,
   ExecutionWarning,
   GenerateScenariosResponse,
   ParseStepsResponse,
@@ -37,6 +44,8 @@ function createEmptyPlan(): RunPlan {
     device: "Desktop",
     headless: false,
     role: "",
+      environmentLibraryId: "",
+      credentialLibraryId: "",
     credentialReference: "",
     loginEmail: "",
     loginPassword: "",
@@ -71,6 +80,32 @@ function buildScenarioLibraryNameFallback(plan: RunPlan): string {
   }
 
   return "Scenario Library";
+}
+
+function buildEnvironmentLibraryNameFallback(plan: RunPlan): string {
+  const environment = plan.environment.trim();
+
+  if (environment && plan.targetUrl.trim()) {
+    return `${environment} Profile`;
+  }
+
+  if (environment) {
+    return environment;
+  }
+
+  return "Environment Profile";
+}
+
+function buildCredentialLibraryNameFallback(plan: RunPlan): string {
+  if (plan.credentialReference.trim()) {
+    return plan.credentialReference.trim();
+  }
+
+  if (plan.loginEmail.trim()) {
+    return `${plan.loginEmail.trim()} Credential`;
+  }
+
+  return "Credential Profile";
 }
 
 const modeLabels: Record<QaMode, string> = {
@@ -212,8 +247,16 @@ function buildCompletionFeedback(run: RunRecord): string {
 }
 
 async function postJson<TResponse>(url: string, payload: unknown): Promise<TResponse> {
+  return requestJson<TResponse>("POST", url, payload);
+}
+
+async function patchJson<TResponse>(url: string, payload: unknown): Promise<TResponse> {
+  return requestJson<TResponse>("PATCH", url, payload);
+}
+
+async function requestJson<TResponse>(method: "POST" | "PATCH", url: string, payload: unknown): Promise<TResponse> {
   const response = await fetch(url, {
-    method: "POST",
+    method,
     headers: {
       "Content-Type": "application/json"
     },
@@ -246,9 +289,13 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [plan, setPlan] = useState<RunPlan>(() => createEmptyPlan());
+  const [environmentLibraryName, setEnvironmentLibraryName] = useState<string>(() => buildEnvironmentLibraryNameFallback(createEmptyPlan()));
+  const [credentialLibraryName, setCredentialLibraryName] = useState<string>(() => buildCredentialLibraryNameFallback(createEmptyPlan()));
   const [scenarioLibraryName, setScenarioLibraryName] = useState<string>(() => buildScenarioLibraryNameFallback(createEmptyPlan()));
   const [parsePreview, setParsePreview] = useState<ParseStepsResponse | null>(null);
   const [scenarioPreview, setScenarioPreview] = useState<GenerateScenariosResponse | null>(null);
+  const [environmentLibraries, setEnvironmentLibraries] = useState<EnvironmentLibraryRecord[]>([]);
+  const [credentialLibraries, setCredentialLibraries] = useState<CredentialLibraryRecord[]>([]);
   const [scenarioLibraries, setScenarioLibraries] = useState<ScenarioLibrary[]>([]);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
@@ -270,7 +317,39 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
   const completedRunCount = runs.filter((run) => isTerminalRun(run.status)).length;
   const draftRunCount = runs.filter((run) => run.status === "draft").length;
   const planWarnings = buildRunPlanWarnings(plan);
+  const parseValidationErrors = getParseValidationErrors(plan);
+  const parseValidationMessages = parseValidationErrors.map((error) =>
+    error.details?.length ? `${error.message} ${error.details.join(" ")}` : error.message
+  );
+  const parseDisabledReason = parseValidationErrors[0]?.message ?? null;
+  const createRunValidationErrors = getRunPlanValidationErrors(plan);
+  const createRunValidationMessages = createRunValidationErrors.map((error) =>
+    error.details?.length ? `${error.message} ${error.details.join(" ")}` : error.message
+  );
+  const createRunDisabledReason = createRunValidationErrors[0]?.message ?? null;
+  const generateScenarioValidationErrors = getScenarioGenerationValidationErrors(plan);
+  const generateScenarioValidationMessages = generateScenarioValidationErrors.map((error) =>
+    error.details?.length ? `${error.message} ${error.details.join(" ")}` : error.message
+  );
+  const generateScenariosDisabledReason = generateScenarioValidationErrors[0]?.message ?? null;
+  const invalidFieldCodes = new Set(
+    [...parseValidationErrors, ...generateScenarioValidationErrors, ...createRunValidationErrors].map((error) => error.code)
+  );
+  const invalidFields = {
+    targetUrl: invalidFieldCodes.has("TARGET_URL_REQUIRED") || invalidFieldCodes.has("TARGET_URL_INVALID"),
+    stepsText:
+      invalidFieldCodes.has("PARSE_STEPS_REQUIRED") ||
+      invalidFieldCodes.has("STEPS_REQUIRED") ||
+      invalidFieldCodes.has("SEED_STEPS_REQUIRED"),
+    scenarioLibraryId: invalidFieldCodes.has("SCENARIO_LIBRARY_REQUIRED"),
+    inlineCredentials: invalidFieldCodes.has("INLINE_CREDENTIALS_INCOMPLETE")
+  };
+  const selectedEnvironmentLibrary = environmentLibraries.find((library) => library.id === (plan.environmentLibraryId ?? "")) ?? null;
+  const selectedCredentialLibrary = credentialLibraries.find((library) => library.id === (plan.credentialLibraryId ?? "")) ?? null;
   const selectedScenarioLibrary = scenarioLibraries.find((library) => library.id === (plan.scenarioLibraryId ?? "")) ?? null;
+  const environmentLibraryNameSource = selectedEnvironmentLibrary?.name ?? buildEnvironmentLibraryNameFallback(plan);
+  const credentialLibraryNameSource = selectedCredentialLibrary?.label ?? buildCredentialLibraryNameFallback(plan);
+  const scenarioLibraryNameSource = selectedScenarioLibrary?.name ?? buildScenarioLibraryNameFallback(plan);
   const selectedRunScenarioLibraryId = activeSelectedRun?.plan.scenarioLibraryId ?? selectedRunSummary?.plan.scenarioLibraryId;
   const selectedRunScenarioLibrary = selectedRunScenarioLibraryId
     ? scenarioLibraries.find((library) => library.id === selectedRunScenarioLibraryId) ?? null
@@ -292,9 +371,11 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
   useEffect(() => {
     startTransition(async () => {
       try {
-        const [runsResponse, scenarioLibrariesResponse] = await Promise.all([
+        const [runsResponse, scenarioLibrariesResponse, environmentLibrariesResponse, credentialLibrariesResponse] = await Promise.all([
           fetch("/api/runs/summary", { cache: "no-store" }),
-          fetch("/api/scenario-libraries", { cache: "no-store" })
+          fetch("/api/scenario-libraries", { cache: "no-store" }),
+          fetch("/api/environments", { cache: "no-store" }),
+          fetch("/api/credentials", { cache: "no-store" })
         ]);
 
         if (!runsResponse.ok) {
@@ -312,6 +393,16 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
         if (scenarioLibrariesResponse.ok) {
           const scenarioLibraryData = (await scenarioLibrariesResponse.json()) as { scenarioLibraries: ScenarioLibrary[] };
           setScenarioLibraries(scenarioLibraryData.scenarioLibraries);
+        }
+
+        if (environmentLibrariesResponse.ok) {
+          const environmentLibraryData = (await environmentLibrariesResponse.json()) as { environmentLibraries: EnvironmentLibraryRecord[] };
+          setEnvironmentLibraries(environmentLibraryData.environmentLibraries);
+        }
+
+        if (credentialLibrariesResponse.ok) {
+          const credentialLibraryData = (await credentialLibrariesResponse.json()) as { credentialLibraries: CredentialLibraryRecord[] };
+          setCredentialLibraries(credentialLibraryData.credentialLibraries);
         }
       } finally {
         setHasLoadedInitialData(true);
@@ -387,22 +478,33 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
       activeController?.abort();
       pollInFlightRef.current = false;
     };
-  }, [selectedRunId, selectedRunSummary?.status]);
+  }, [selectedRunId, selectedRunSummary]);
 
   useEffect(() => {
     if (selectedRunSummary && !isActiveRun(selectedRunSummary.status)) {
-      void refreshScenarioLibraries();
+      void (async () => {
+        const response = await fetch("/api/scenario-libraries", { cache: "no-store" });
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as { scenarioLibraries: ScenarioLibrary[] };
+        setScenarioLibraries(data.scenarioLibraries);
+      })();
     }
-  }, [selectedRunId, selectedRunSummary?.status]);
+  }, [selectedRunSummary]);
 
   useEffect(() => {
-    if (selectedScenarioLibrary) {
-      setScenarioLibraryName(selectedScenarioLibrary.name);
-      return;
-    }
+    setEnvironmentLibraryName(environmentLibraryNameSource);
+  }, [environmentLibraryNameSource]);
 
-    setScenarioLibraryName(buildScenarioLibraryNameFallback(plan));
-  }, [selectedScenarioLibrary?.id, selectedScenarioLibrary?.name, plan.featureArea, plan.environment]);
+  useEffect(() => {
+    setCredentialLibraryName(credentialLibraryNameSource);
+  }, [credentialLibraryNameSource]);
+
+  useEffect(() => {
+    setScenarioLibraryName(scenarioLibraryNameSource);
+  }, [scenarioLibraryNameSource]);
 
   useEffect(() => {
     if (!draftHandoffScenarioLibraryId) {
@@ -424,7 +526,18 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
       return;
     }
 
-    applyScenarioLibrarySelection(requestedLibrary, `Loaded saved scenario library ${requestedLibrary.name} from Scenario Library. Review mission parameters and create a run.`);
+    updatePlan("scenarioLibraryId", requestedLibrary.id);
+    setScenarioPreview({
+      scenarios: requestedLibrary.scenarios,
+      coverageGaps: requestedLibrary.coverageGaps,
+      riskSummary: requestedLibrary.riskSummary
+    });
+    updatePlan("featureArea", requestedLibrary.featureArea);
+    updatePlan("environment", requestedLibrary.environment);
+    updatePlan("targetUrl", requestedLibrary.targetUrl);
+    updatePlan("role", requestedLibrary.role);
+    setScenarioLibraryName(requestedLibrary.name);
+    setFeedback(`Loaded saved scenario library ${requestedLibrary.name} from Scenario Library. Review mission parameters and create a run.`);
     router.replace("/draft");
   }, [draftHandoffScenarioLibraryId, scenarioLibraries, router]);
 
@@ -438,12 +551,15 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
     const currentStatus = activeSelectedRun.status;
 
     if (previousStatus && isActiveRun(previousStatus) && isTerminalRun(currentStatus)) {
-      navigateToWorkflowView("review");
+      setWorkflowView("review");
+      if (pathname !== "/review") {
+        router.push("/review");
+      }
       setFeedback(buildCompletionFeedback(activeSelectedRun));
     }
 
     previousSelectedRunStatusRef.current = currentStatus;
-  }, [activeSelectedRun]);
+  }, [activeSelectedRun, pathname, router]);
 
   function updatePlan<Key extends keyof RunPlan>(key: Key, value: RunPlan[Key]) {
     setPlan((current) => ({
@@ -471,6 +587,58 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
     setScenarioLibraries(data.scenarioLibraries);
   }
 
+  async function refreshEnvironmentLibraries() {
+    const response = await fetch("/api/environments", { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+
+    const data = (await response.json()) as { environmentLibraries: EnvironmentLibraryRecord[] };
+    setEnvironmentLibraries(data.environmentLibraries);
+  }
+
+  async function refreshCredentialLibraries() {
+    const response = await fetch("/api/credentials", { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+
+    const data = (await response.json()) as { credentialLibraries: CredentialLibraryRecord[] };
+    setCredentialLibraries(data.credentialLibraries);
+  }
+
+  function applyCredentialLibrarySelection(selectedLibrary: CredentialLibraryRecord, feedbackMessage?: string) {
+    updatePlan("credentialLibraryId", selectedLibrary.id);
+    updatePlan("credentialReference", selectedLibrary.reference ?? selectedLibrary.label);
+    updatePlan("loginEmail", "");
+    updatePlan("loginPassword", "");
+    setCredentialLibraryName(selectedLibrary.label);
+    setFeedback(feedbackMessage ?? `Loaded saved credential profile ${selectedLibrary.label}.`);
+  }
+
+  function applyEnvironmentLibrarySelection(selectedLibrary: EnvironmentLibraryRecord, feedbackMessage?: string) {
+    updatePlan("environmentLibraryId", selectedLibrary.id);
+    updatePlan("environment", selectedLibrary.environment);
+    updatePlan("targetUrl", selectedLibrary.targetUrl);
+    updatePlan("role", selectedLibrary.role);
+    updatePlan("browser", selectedLibrary.browser);
+    updatePlan("device", selectedLibrary.device);
+    updatePlan("safeMode", selectedLibrary.safeMode);
+    updatePlan("riskLevel", selectedLibrary.riskLevel);
+    setEnvironmentLibraryName(selectedLibrary.name);
+
+    if (selectedLibrary.defaultCredentialId) {
+      const defaultCredential = credentialLibraries.find((library) => library.id === selectedLibrary.defaultCredentialId);
+      if (defaultCredential) {
+        applyCredentialLibrarySelection(defaultCredential);
+      } else {
+        updatePlan("credentialLibraryId", selectedLibrary.defaultCredentialId);
+      }
+    }
+
+    setFeedback(feedbackMessage ?? `Loaded saved environment profile ${selectedLibrary.name}.`);
+  }
+
   function applyScenarioLibrarySelection(selectedLibrary: ScenarioLibrary, feedbackMessage?: string) {
     updatePlan("scenarioLibraryId", selectedLibrary.id);
     setScenarioPreview({
@@ -496,6 +664,89 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
     }
 
     applyScenarioLibrarySelection(selectedLibrary);
+  }
+
+  function handleEnvironmentLibrarySelection(environmentLibraryId: string) {
+    updatePlan("environmentLibraryId", environmentLibraryId);
+
+    if (!environmentLibraryId) {
+      setEnvironmentLibraryName(buildEnvironmentLibraryNameFallback(plan));
+      return;
+    }
+
+    const selectedLibrary = environmentLibraries.find((library) => library.id === environmentLibraryId);
+    if (!selectedLibrary) {
+      setEnvironmentLibraryName(buildEnvironmentLibraryNameFallback(plan));
+      return;
+    }
+
+    applyEnvironmentLibrarySelection(selectedLibrary);
+  }
+
+  function handleCredentialLibrarySelection(credentialLibraryId: string) {
+    updatePlan("credentialLibraryId", credentialLibraryId);
+
+    if (!credentialLibraryId) {
+      updatePlan("credentialReference", "");
+      setCredentialLibraryName(buildCredentialLibraryNameFallback(plan));
+      return;
+    }
+
+    const selectedLibrary = credentialLibraries.find((library) => library.id === credentialLibraryId);
+    if (!selectedLibrary) {
+      setCredentialLibraryName(buildCredentialLibraryNameFallback(plan));
+      return;
+    }
+
+    applyCredentialLibrarySelection(selectedLibrary);
+  }
+
+  async function mutateEnvironmentLibrary(action: "create" | "update") {
+    const payload = {
+      name: environmentLibraryName.trim(),
+      targetUrl: plan.targetUrl,
+      environment: plan.environment,
+      role: plan.role,
+      browser: plan.browser,
+      device: plan.device,
+      safeMode: plan.safeMode,
+      riskLevel: plan.riskLevel,
+      defaultCredentialId: (plan.credentialLibraryId ?? "").trim() || undefined,
+      notes: `Saved from Draft for ${plan.featureArea || plan.environment || plan.targetUrl || "current mission"}.`
+    };
+
+    const data = action === "create"
+      ? await postJson<{ environmentLibrary: EnvironmentLibraryRecord }>("/api/environments", payload)
+      : await patchJson<{ environmentLibrary: EnvironmentLibraryRecord }>(`/api/environments/${selectedEnvironmentLibrary?.id}`, payload);
+
+    await refreshEnvironmentLibraries();
+    updatePlan("environmentLibraryId", data.environmentLibrary.id);
+    setEnvironmentLibraryName(data.environmentLibrary.name);
+    return data.environmentLibrary;
+  }
+
+  async function mutateCredentialLibrary(action: "create" | "update") {
+    const username = plan.loginEmail.trim() || selectedCredentialLibrary?.username || "";
+    const password = plan.loginPassword.trim() || undefined;
+    const reference = plan.credentialReference.trim() || selectedCredentialLibrary?.reference;
+    const secretMode = password ? "stored-secret" : selectedCredentialLibrary?.secretMode ?? "reference-only";
+    const payload = {
+      label: credentialLibraryName.trim(),
+      username,
+      password,
+      secretMode,
+      reference,
+      status: selectedCredentialLibrary?.status ?? "active",
+      notes: `Saved from Draft for ${plan.featureArea || plan.environment || username}.`
+    };
+
+    const data = action === "create"
+      ? await postJson<{ credentialLibrary: CredentialLibraryRecord }>("/api/credentials", payload)
+      : await patchJson<{ credentialLibrary: CredentialLibraryRecord }>(`/api/credentials/${selectedCredentialLibrary?.id}`, payload);
+
+    await refreshCredentialLibraries();
+    applyCredentialLibrarySelection(data.credentialLibrary);
+    return data.credentialLibrary;
   }
 
   function buildActiveScenarioPayload() {
@@ -545,6 +796,58 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
         setFeedback(`Saved scenario library ${scenarioLibrary.name}.`);
       } catch (error) {
         setFeedback(error instanceof Error ? error.message : "Failed to save scenario library.");
+      }
+    });
+  }
+
+  async function handleSaveEnvironmentLibrary() {
+    startTransition(async () => {
+      try {
+        const environmentLibrary = await mutateEnvironmentLibrary("create");
+        setFeedback(`Saved environment profile ${environmentLibrary.name}.`);
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "Failed to save environment profile.");
+      }
+    });
+  }
+
+  async function handleUpdateEnvironmentLibrary() {
+    startTransition(async () => {
+      try {
+        if (!selectedEnvironmentLibrary) {
+          throw new Error("Select an existing environment profile before updating it.");
+        }
+
+        const environmentLibrary = await mutateEnvironmentLibrary("update");
+        setFeedback(`Updated environment profile ${environmentLibrary.name}.`);
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "Failed to update environment profile.");
+      }
+    });
+  }
+
+  async function handleSaveCredentialLibrary() {
+    startTransition(async () => {
+      try {
+        const credentialLibrary = await mutateCredentialLibrary("create");
+        setFeedback(`Saved credential profile ${credentialLibrary.label}.`);
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "Failed to save credential profile.");
+      }
+    });
+  }
+
+  async function handleUpdateCredentialLibrary() {
+    startTransition(async () => {
+      try {
+        if (!selectedCredentialLibrary) {
+          throw new Error("Select an existing credential profile before updating it.");
+        }
+
+        const credentialLibrary = await mutateCredentialLibrary("update");
+        setFeedback(`Updated credential profile ${credentialLibrary.label}.`);
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "Failed to update credential profile.");
       }
     });
   }
@@ -616,6 +919,12 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
   }
 
   async function handleParse() {
+    if (parseValidationErrors.length) {
+      const firstError = parseValidationErrors[0];
+      setFeedback(firstError.details?.length ? `${firstError.message} ${firstError.details.join(" ")}` : firstError.message);
+      return;
+    }
+
     startTransition(async () => {
       try {
         const data = await postJson<ParseStepsResponse>("/api/steps/parse", {
@@ -631,6 +940,12 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
   }
 
   async function handleGenerateScenarios() {
+    if (generateScenarioValidationErrors.length) {
+      const firstError = generateScenarioValidationErrors[0];
+      setFeedback(firstError.details?.length ? `${firstError.message} ${firstError.details.join(" ")}` : firstError.message);
+      return;
+    }
+
     startTransition(async () => {
       try {
         const data = await postJson<GenerateScenariosResponse>("/api/scenarios/generate", plan);
@@ -643,6 +958,12 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
   }
 
   async function handleCreateRun() {
+    if (createRunValidationErrors.length) {
+      const firstError = createRunValidationErrors[0];
+      setFeedback(firstError.details?.length ? `${firstError.message} ${firstError.details.join(" ")}` : firstError.message);
+      return;
+    }
+
     startTransition(async () => {
       try {
         const data = await postJson<{ run: RunRecord }>("/api/runs", plan);
@@ -781,8 +1102,21 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
           plan={plan}
           parsePreview={parsePreview}
           scenarioPreview={scenarioPreview}
+          invalidFields={invalidFields}
+          parseDisabledReason={parseDisabledReason}
+          parseValidationMessages={parseValidationMessages}
+          createRunDisabledReason={createRunDisabledReason}
+          createRunValidationMessages={createRunValidationMessages}
+          generateScenariosDisabledReason={generateScenariosDisabledReason}
+          generateScenarioValidationMessages={generateScenarioValidationMessages}
+          environmentLibraries={environmentLibraries}
+          credentialLibraries={credentialLibraries}
           scenarioLibraries={scenarioLibraries}
+          selectedEnvironmentLibrary={selectedEnvironmentLibrary}
+          selectedCredentialLibrary={selectedCredentialLibrary}
           selectedScenarioLibrary={selectedScenarioLibrary}
+          environmentLibraryName={environmentLibraryName}
+          credentialLibraryName={credentialLibraryName}
           scenarioLibraryName={scenarioLibraryName}
           planWarnings={planWarnings}
           feedback={feedback}
@@ -790,11 +1124,19 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
           modeLabels={modeLabels}
           riskOptions={riskOptions}
           onPlanChange={updatePlan}
+          onEnvironmentLibraryNameChange={setEnvironmentLibraryName}
+          onCredentialLibraryNameChange={setCredentialLibraryName}
           onScenarioLibraryNameChange={setScenarioLibraryName}
+          onSelectEnvironmentLibrary={handleEnvironmentLibrarySelection}
+          onSelectCredentialLibrary={handleCredentialLibrarySelection}
           onSelectScenarioLibrary={handleScenarioLibrarySelection}
           onParse={handleParse}
           onGenerateScenarios={handleGenerateScenarios}
           onCreateRun={handleCreateRun}
+          onSaveEnvironmentLibrary={handleSaveEnvironmentLibrary}
+          onUpdateEnvironmentLibrary={handleUpdateEnvironmentLibrary}
+          onSaveCredentialLibrary={handleSaveCredentialLibrary}
+          onUpdateCredentialLibrary={handleUpdateCredentialLibrary}
           onSaveAsLibrary={handleSaveAsLibrary}
           onUpdateLibrary={handleUpdateLibrary}
         />
@@ -819,6 +1161,7 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
           runs={runs}
           selectedRun={activeSelectedRun}
           selectedScenarioLibrary={selectedRunScenarioLibrary}
+          feedback={feedback}
           onSelectRun={handleWorkspaceRunSelection}
           onSaveRunAsLibrary={handleSaveRunAsLibrary}
           onUpdateRunLibrary={handleUpdateRunLibrary}

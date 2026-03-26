@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { QaCommandCenter } from "@/components/qa-command-center";
+import { getQaStoreBackendKind } from "@/lib/qa/storage/backend";
 
 export const metadata: Metadata = {
   title: "Draft | QA Command Center",
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 export default function DraftPage() {
   return (
     <Suspense fallback={null}>
-      <QaCommandCenter initialWorkflowView="draft" />
+      <QaCommandCenter initialWorkflowView="draft" storeBackendLabel={getQaStoreBackendKind()} />
     </Suspense>
   );
 }

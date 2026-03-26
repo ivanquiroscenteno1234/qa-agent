@@ -13,6 +13,7 @@ interface ReviewWorkflowViewProps {
   runs: RunSummary[];
   selectedRun: RunRecord | null;
   selectedScenarioLibrary: ScenarioLibrary | null;
+  feedback: string;
   onSelectRun: (run: RunSummary) => void;
   onSaveRunAsLibrary: (run: RunRecord) => void;
   onUpdateRunLibrary: (run: RunRecord) => void;
@@ -28,6 +29,7 @@ export function ReviewWorkflowView({
   runs,
   selectedRun,
   selectedScenarioLibrary,
+  feedback,
   onSelectRun,
   onSaveRunAsLibrary,
   onUpdateRunLibrary,
@@ -102,6 +104,8 @@ export function ReviewWorkflowView({
                       : "This run is still active. Switch back to Monitor for live progress."}
                   </span>
                 </div>
+
+                <p className="feedback-banner">{feedback}</p>
 
                 <p className="muted">{selectedRun.summary}</p>
 

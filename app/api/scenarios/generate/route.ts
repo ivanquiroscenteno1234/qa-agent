@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { formatZodError, runPlanSchema, validateRunPlanForMode } from "@/lib/qa/plan-validation";
+import { formatZodError, runPlanSchema, validateScenarioGenerationPlan } from "@/lib/qa/plan-validation";
 import { generateScenarios } from "@/lib/qa/scenario-generator";
 
 export async function POST(request: Request) {
@@ -11,8 +11,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
   }
 
-  const validationError = validateRunPlanForMode(parsed.data);
-  if (validationError && parsed.data.mode !== "exploratory-session") {
+  const validationError = validateScenarioGenerationPlan(parsed.data);
+  if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 400 });
   }
 

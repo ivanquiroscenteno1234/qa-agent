@@ -1,4 +1,4 @@
-import type { RunRecord, ScenarioLibrary } from "@/lib/types";
+import type { CredentialLibraryRecord, EnvironmentLibraryRecord, RunRecord, ScenarioLibrary } from "@/lib/types";
 
 export interface CredentialVaultCardModel {
   id: string;
@@ -29,38 +29,36 @@ function formatObservedTimestamp(value?: string): string {
   return new Date(value).toLocaleString();
 }
 
-function summarizeReferenceScope(reference: string): string {
-  if (reference.startsWith("vault://")) {
-    return "Vault reference string";
+function summarizeCredentialScope(credential: CredentialLibraryRecord): string {
+  if (credential.secretMode === "reference-only") {
+    return credential.reference?.startsWith("vault://") ? "Vault reference string" : "Reference-only credential";
   }
 
-  if (!reference.trim()) {
-    return "No reference provided";
-  }
-
-  return "Operator-provided reference";
+  return credential.hasStoredSecret ? "Local stored secret" : "Credential profile";
 }
 
-function countRunsUsingReference(runs: RunRecord[], reference: string): number {
-  return runs.filter((run) => (run.plan.credentialReference ?? "") === reference).length;
+function countRunsUsingCredential(runs: RunRecord[], credential: CredentialLibraryRecord): number {
+  return runs.filter((run) => (run.plan.credentialLibraryId ?? "") === credential.id).length;
 }
 
-function buildCredentialReferenceCards(runs: RunRecord[]): CredentialVaultCardModel[] {
-  const references = [...new Set(runs.map((run) => run.plan.credentialReference?.trim() ?? "").filter(Boolean))];
-
-  return references.map((reference) => {
-    const matchingRuns = runs.filter((run) => run.plan.credentialReference?.trim() === reference);
+function buildCredentialReferenceCards(credentials: CredentialLibraryRecord[], runs: RunRecord[]): CredentialVaultCardModel[] {
+  return credentials.map((credential) => {
+    const matchingRuns = runs.filter((run) => (run.plan.credentialLibraryId ?? "") === credential.id);
     const lastRun = [...matchingRuns].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
-    const totalRuns = countRunsUsingReference(runs, reference);
+    const totalRuns = countRunsUsingCredential(runs, credential);
 
     return {
-      id: `credential-${reference}`,
-      label: reference,
-      status: "active",
-      scope: summarizeReferenceScope(reference),
-      detail: `${totalRuns} run${totalRuns === 1 ? "" : "s"} referenced this credential handle.`,
-      note: "References are stored in local JSON state. No rotation, vault sync, or revocation endpoint exists yet.",
-      lastUsed: formatObservedTimestamp(lastRun?.updatedAt)
+      id: credential.id,
+      label: credential.label,
+      status: credential.status,
+      scope: summarizeCredentialScope(credential),
+      detail: totalRuns
+        ? `${totalRuns} run${totalRuns === 1 ? "" : "s"} used this saved credential profile.`
+        : "Saved credential profile with no recorded runs yet.",
+      note: credential.secretMode === "reference-only"
+        ? `Reference handle: ${credential.reference ?? "not set"}`
+        : "Credential value is stored locally and resolved server-side during execution.",
+      lastUsed: formatObservedTimestamp(credential.lastUsedAt ?? lastRun?.updatedAt)
     };
   });
 }
@@ -85,72 +83,50 @@ function buildInlineEntryCard(runs: RunRecord[]): CredentialVaultCardModel | und
   };
 }
 
-export function buildCredentialVaultCards(runs: RunRecord[]): CredentialVaultCardModel[] {
-  const cards = buildCredentialReferenceCards(runs);
+export function buildCredentialVaultCards(credentials: CredentialLibraryRecord[], runs: RunRecord[]): CredentialVaultCardModel[] {
+  const cards = buildCredentialReferenceCards(credentials, runs);
   const inlineEntryCard = buildInlineEntryCard(runs);
 
   return inlineEntryCard ? [...cards, inlineEntryCard] : cards;
 }
 
-interface EnvironmentObservation {
-  environment: string;
-  targetUrl: string;
-  updatedAt?: string;
-  safeMode?: boolean;
-  source: "run" | "library";
-}
-
-export function buildEnvironmentCards(runs: RunRecord[], libraries: ScenarioLibrary[]): EnvironmentCardModel[] {
-  const observations: EnvironmentObservation[] = [
-    ...runs.map((run) => ({
-      environment: run.plan.environment,
-      targetUrl: run.plan.targetUrl,
-      updatedAt: run.updatedAt,
-      safeMode: run.plan.safeMode,
-      source: "run" as const
-    })),
-    ...libraries.map((library) => ({
-      environment: library.environment,
-      targetUrl: library.targetUrl,
-      updatedAt: library.updatedAt,
-      source: "library" as const
-    }))
-  ].filter((observation) => observation.environment.trim() || observation.targetUrl.trim());
-
-  const byEnvironment = new Map<string, EnvironmentObservation[]>();
-
-  for (const observation of observations) {
-    const key = `${observation.environment}::${observation.targetUrl}`;
-    const current = byEnvironment.get(key) ?? [];
-    current.push(observation);
-    byEnvironment.set(key, current);
-  }
-
-  return [...byEnvironment.entries()]
-    .map(([key, observationGroup]) => {
-      const [name, endpoint] = key.split("::");
-      const matchingRuns = runs.filter((run) => run.plan.environment === name && run.plan.targetUrl === endpoint);
-      const matchingLibraries = libraries.filter((library) => library.environment === name && library.targetUrl === endpoint);
+export function buildEnvironmentCards(
+  environments: EnvironmentLibraryRecord[],
+  runs: RunRecord[],
+  libraries: ScenarioLibrary[]
+): EnvironmentCardModel[] {
+  return environments
+    .map((environment) => {
+      const matchingRuns = runs.filter(
+        (run) =>
+          (run.plan.environmentLibraryId ?? "") === environment.id ||
+          (run.plan.environment === environment.environment && run.plan.targetUrl === environment.targetUrl)
+      );
+      const matchingLibraries = libraries.filter(
+        (library) => library.environment === environment.environment && library.targetUrl === environment.targetUrl
+      );
       const lastRun = [...matchingRuns].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
       const lastLibrary = [...matchingLibraries].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
-      const lastSeen = lastRun?.updatedAt ?? lastLibrary?.updatedAt;
+      const lastSeen = lastRun?.updatedAt ?? lastLibrary?.updatedAt ?? environment.updatedAt;
       const safeModeRate = matchingRuns.length
         ? Math.round((matchingRuns.filter((run) => run.plan.safeMode).length / matchingRuns.length) * 100)
-        : 100;
+        : environment.safeMode
+          ? 100
+          : 0;
       const health: EnvironmentCardModel["health"] = matchingRuns.length ? "observed" : "caution";
 
       return {
-        id: `environment-${name}-${endpoint}`,
-        name: name || "Unlabeled environment",
+        id: environment.id,
+        name: environment.name || environment.environment || "Unlabeled environment",
         health,
-        endpoint: endpoint || "No endpoint recorded",
+        endpoint: environment.targetUrl || "No endpoint recorded",
         probeStatus: "No live probe configured",
         observedUsage: matchingRuns.length
           ? `${matchingRuns.length} recorded run${matchingRuns.length === 1 ? "" : "s"}; ${safeModeRate}% observe-only`
-          : `${observationGroup.length} saved reference${observationGroup.length === 1 ? "" : "s"}; no run history`,
-        note: matchingRuns.length
-          ? `${matchingRuns.length} recorded run${matchingRuns.length === 1 ? "" : "s"}; health is inferred from saved activity, not from active monitoring.`
-          : "Known only from saved library metadata. Add run telemetry before treating this as live health.",
+          : "Saved environment profile with no recorded runs yet.",
+        note: matchingLibraries.length
+          ? `${matchingLibraries.length} scenario librar${matchingLibraries.length === 1 ? "y" : "ies"} match this target.`
+          : "No saved scenario libraries are currently linked to this environment target.",
         lastSeen: formatObservedTimestamp(lastSeen)
       };
     })

@@ -1,5 +1,7 @@
 import type { Locator, Page } from "playwright";
 
+import { revealCredentialSecret } from "@/lib/qa/credential-secret";
+import { getStoredCredentialLibrary, touchCredentialLibraryLastUsed } from "@/lib/qa/store";
 import type { ParsedStep, RunPlan } from "@/lib/types";
 
 type LoginOutcome = { observedTarget: string; actionResult: string; notes: string };
@@ -9,9 +11,38 @@ interface AuthSessionDependencies {
   executeLogin: (page: Page, parsedSteps: ParsedStep[], plan: RunPlan) => Promise<LoginOutcome>;
 }
 
+export function hasCredentialSource(plan: RunPlan): boolean {
+  return Boolean(
+    (plan.credentialLibraryId ?? "").trim() ||
+      plan.credentialReference.trim() ||
+      (plan.loginEmail.trim() && plan.loginPassword.trim())
+  );
+}
+
 export async function resolveCredentials(plan: RunPlan, parsedSteps: ParsedStep[]): Promise<{ email: string; password: string }> {
   if (plan.loginEmail && plan.loginPassword) {
     return { email: plan.loginEmail, password: plan.loginPassword };
+  }
+
+  if ((plan.credentialLibraryId ?? "").trim()) {
+    const credential = await getStoredCredentialLibrary(plan.credentialLibraryId ?? "");
+
+    if (!credential) {
+      throw new Error("The selected saved credential profile could not be found.");
+    }
+
+    if (credential.status === "revoked") {
+      throw new Error(`Saved credential ${credential.label} is revoked and cannot be used for execution.`);
+    }
+
+    if (credential.password) {
+      await touchCredentialLibraryLastUsed(credential.id);
+      return { email: credential.username, password: revealCredentialSecret(credential.password) ?? "" };
+    }
+
+    if (credential.secretMode === "reference-only") {
+      throw new Error(`Saved credential ${credential.label} is reference-only and cannot be used for automatic login yet.`);
+    }
   }
 
   const loginStep = parsedSteps.find((step) => step.actionType === "login");
@@ -46,7 +77,7 @@ export async function ensureAuthenticatedState(
   await page.goto(plan.targetUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
 
-  if (await pageHasLoginForm(page, deps)) {
+  if (hasCredentialSource(plan) && (await pageHasLoginForm(page, deps))) {
     const login = await deps.executeLogin(page, [], plan);
     return login.notes;
   }

@@ -1,4 +1,8 @@
 import type {
+  CredentialLibraryInput,
+  CredentialLibraryRecord,
+  EnvironmentLibraryInput,
+  EnvironmentLibraryRecord,
   RunSummary,
   ExecutionWarning,
   GenerateScenariosResponse,
@@ -6,7 +10,8 @@ import type {
   RunPlan,
   RunRecord,
   RunStatus,
-  ScenarioLibrary
+  ScenarioLibrary,
+  StoredCredentialLibraryRecord
 } from "@/lib/types";
 import {
   createInitialScenarioLibraryVersion,
@@ -14,6 +19,7 @@ import {
   normalizeScenarioLibrary,
   summarizeScenarioLibraryChanges
 } from "@/lib/qa/scenario-library";
+import { protectCredentialSecret } from "@/lib/qa/credential-secret";
 import type { RunRecordPatch } from "@/lib/qa/storage/types";
 import { createId } from "@/lib/qa/utils";
 
@@ -24,6 +30,15 @@ export function createScenarioLibraryName(plan: RunPlan): string {
 export function normalizeRunRecord(record: RunRecord): RunRecord {
   return {
     ...record,
+    plan: {
+      ...record.plan,
+      environmentLibraryId: record.plan.environmentLibraryId,
+      credentialLibraryId: record.plan.credentialLibraryId,
+      credentialReference: record.plan.credentialReference ?? "",
+      loginEmail: record.plan.loginEmail ?? "",
+      loginPassword: record.plan.loginPassword ?? "",
+      scenarioLibraryId: record.plan.scenarioLibraryId
+    },
     currentPhase: record.currentPhase ?? "intake",
     currentActivity: record.currentActivity,
     currentStepNumber: record.currentStepNumber,
@@ -80,6 +95,89 @@ export function buildRunSummary(record: RunRecord): RunSummary {
 
 export function normalizeScenarioLibraryRecord(record: ScenarioLibrary): ScenarioLibrary {
   return normalizeScenarioLibrary(record);
+}
+
+export function normalizeEnvironmentLibraryRecord(record: EnvironmentLibraryRecord): EnvironmentLibraryRecord {
+  return {
+    ...record,
+    defaultCredentialId: record.defaultCredentialId?.trim() || undefined,
+    notes: record.notes ?? ""
+  };
+}
+
+export function normalizeStoredCredentialLibraryRecord(record: StoredCredentialLibraryRecord): StoredCredentialLibraryRecord {
+  return {
+    ...record,
+    reference: record.reference?.trim() || undefined,
+    notes: record.notes ?? "",
+    password: record.password?.trim() || undefined,
+    lastUsedAt: record.lastUsedAt ?? undefined
+  };
+}
+
+export function sanitizeCredentialLibraryRecord(record: StoredCredentialLibraryRecord): CredentialLibraryRecord {
+  const normalized = normalizeStoredCredentialLibraryRecord(record);
+
+  return {
+    id: normalized.id,
+    label: normalized.label,
+    username: normalized.username,
+    secretMode: normalized.secretMode,
+    reference: normalized.reference,
+    hasStoredSecret: Boolean(normalized.password),
+    status: normalized.status,
+    notes: normalized.notes,
+    lastUsedAt: normalized.lastUsedAt,
+    createdAt: normalized.createdAt,
+    updatedAt: normalized.updatedAt
+  };
+}
+
+export function buildEnvironmentLibraryRecord(
+  existing: EnvironmentLibraryRecord | undefined,
+  input: EnvironmentLibraryInput,
+  now: string
+): EnvironmentLibraryRecord {
+  return normalizeEnvironmentLibraryRecord({
+    id: existing?.id ?? createId("environment_library"),
+    name: input.name.trim(),
+    targetUrl: input.targetUrl.trim(),
+    environment: input.environment.trim(),
+    role: input.role.trim(),
+    browser: input.browser.trim(),
+    device: input.device.trim(),
+    safeMode: input.safeMode,
+    riskLevel: input.riskLevel,
+    defaultCredentialId: input.defaultCredentialId?.trim() || undefined,
+    notes: input.notes.trim(),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  });
+}
+
+export function buildStoredCredentialLibraryRecord(
+  existing: StoredCredentialLibraryRecord | undefined,
+  input: CredentialLibraryInput,
+  now: string
+): StoredCredentialLibraryRecord {
+  const nextPassword =
+    input.secretMode === "stored-secret"
+      ? protectCredentialSecret(input.password?.trim() || existing?.password?.trim() || undefined)
+      : undefined;
+
+  return normalizeStoredCredentialLibraryRecord({
+    id: existing?.id ?? createId("credential_library"),
+    label: input.label.trim(),
+    username: input.username.trim(),
+    password: nextPassword,
+    secretMode: input.secretMode,
+    reference: input.reference?.trim() || undefined,
+    status: input.status,
+    notes: input.notes.trim(),
+    lastUsedAt: existing?.lastUsedAt,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  });
 }
 
 export function hasScenarioLibraryChanges(existing: ScenarioLibrary, generated: GenerateScenariosResponse): boolean {
@@ -247,6 +345,14 @@ export function sortRuns(runs: RunRecord[]): RunRecord[] {
 }
 
 export function sortScenarioLibraries(libraries: ScenarioLibrary[]): ScenarioLibrary[] {
+  return [...libraries].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+export function sortEnvironmentLibraries(libraries: EnvironmentLibraryRecord[]): EnvironmentLibraryRecord[] {
+  return [...libraries].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+export function sortCredentialLibraries(libraries: StoredCredentialLibraryRecord[]): StoredCredentialLibraryRecord[] {
   return [...libraries].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 

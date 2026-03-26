@@ -1,17 +1,30 @@
 import type {
   Artifact,
+  CredentialLibraryInput,
+  CredentialLibraryRecord,
+  EnvironmentLibraryInput,
+  EnvironmentLibraryRecord,
   ExecutionWarning,
   GenerateScenariosResponse,
   RunEvent,
   RunRecord,
   RunSummary,
   ScenarioLibrary,
-  RunPlan
+  RunPlan,
+  StoredCredentialLibraryRecord
 } from "@/lib/types";
 
 export type RunRecordPatch = Partial<Omit<RunRecord, "id" | "createdAt">>;
 
 export interface QaStoreBackend {
+  listEnvironmentLibraries(): Promise<EnvironmentLibraryRecord[]>;
+  getEnvironmentLibrary(environmentLibraryId: string): Promise<EnvironmentLibraryRecord | undefined>;
+  upsertEnvironmentLibrary(input: EnvironmentLibraryInput, environmentLibraryId?: string): Promise<EnvironmentLibraryRecord>;
+  listCredentialLibraries(): Promise<CredentialLibraryRecord[]>;
+  getCredentialLibrary(credentialLibraryId: string): Promise<CredentialLibraryRecord | undefined>;
+  getStoredCredentialLibrary(credentialLibraryId: string): Promise<StoredCredentialLibraryRecord | undefined>;
+  upsertCredentialLibrary(input: CredentialLibraryInput, credentialLibraryId?: string): Promise<CredentialLibraryRecord>;
+  touchCredentialLibraryLastUsed(credentialLibraryId: string, usedAt?: string): Promise<CredentialLibraryRecord | undefined>;
   listScenarioLibraries(): Promise<ScenarioLibrary[]>;
   getScenarioLibrary(scenarioLibraryId: string): Promise<ScenarioLibrary | undefined>;
   upsertScenarioLibraryFromRun(

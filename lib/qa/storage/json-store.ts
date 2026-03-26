@@ -3,6 +3,10 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 
 import type {
   Artifact,
+  CredentialLibraryInput,
+  CredentialLibraryRecord,
+  EnvironmentLibraryInput,
+  EnvironmentLibraryRecord,
   ExecutionWarning,
   GenerateScenariosResponse,
   RunEvent,
@@ -10,27 +14,41 @@ import type {
   RunRecord,
   RunStatus,
   RunSummary,
-  ScenarioLibrary
+  ScenarioLibrary,
+  StoredCredentialLibraryRecord
 } from "@/lib/types";
 import { buildScenarioLibraryComparison } from "@/lib/qa/scenario-library";
 import { generateScenarios } from "@/lib/qa/scenario-generator";
 import { parsePlainTextSteps } from "@/lib/qa/step-parser";
-import { dataDirectory, runStorePath, scenarioLibraryStorePath } from "@/lib/qa/storage/paths";
 import {
+  credentialLibraryStorePath,
+  dataDirectory,
+  environmentLibraryStorePath,
+  runStorePath,
+  scenarioLibraryStorePath
+} from "@/lib/qa/storage/paths";
+import {
+  buildEnvironmentLibraryRecord,
+  buildStoredCredentialLibraryRecord,
   buildScenarioLibraryRecord,
   buildRunSummary,
   createExecutionWarning,
   createRunEvent,
   findExistingScenarioLibraryForCreate,
-  findMatchingScenarioLibrary,
   isTerminalRunStatus,
   mergeRunRecord,
+  normalizeEnvironmentLibraryRecord,
   normalizeRunRecord,
   normalizeScenarioLibraryRecord,
+  normalizeStoredCredentialLibraryRecord,
+  sanitizeCredentialLibraryRecord,
   sanitizeRunRecordContent,
+  sortCredentialLibraries,
+  sortEnvironmentLibraries,
   sortRuns,
   sortScenarioLibraries
 } from "@/lib/qa/storage/shared";
+import { needsCredentialSecretProtection, protectCredentialSecret } from "@/lib/qa/credential-secret";
 import type { QaStoreBackend, RunRecordPatch } from "@/lib/qa/storage/types";
 import { createId } from "@/lib/qa/utils";
 
@@ -53,6 +71,18 @@ async function ensureStore(): Promise<void> {
     await readFile(scenarioLibraryStorePath, "utf8");
   } catch {
     await writeFile(scenarioLibraryStorePath, "[]", "utf8");
+  }
+
+  try {
+    await readFile(environmentLibraryStorePath, "utf8");
+  } catch {
+    await writeFile(environmentLibraryStorePath, "[]", "utf8");
+  }
+
+  try {
+    await readFile(credentialLibraryStorePath, "utf8");
+  } catch {
+    await writeFile(credentialLibraryStorePath, "[]", "utf8");
   }
 }
 
@@ -97,29 +127,51 @@ async function writeJsonAtomic(filePath: string, content: string): Promise<void>
   }
 }
 
-export async function readSeedDataFromJsonStore(): Promise<{ runs: RunRecord[]; scenarioLibraries: ScenarioLibrary[] }> {
-  const [runs, scenarioLibraries] = await Promise.all([
+export async function readSeedDataFromJsonStore(): Promise<{
+  runs: RunRecord[];
+  scenarioLibraries: ScenarioLibrary[];
+  environmentLibraries: EnvironmentLibraryRecord[];
+  credentialLibraries: StoredCredentialLibraryRecord[];
+}> {
+  const [runs, scenarioLibraries, environmentLibraries, credentialLibraries] = await Promise.all([
     readJsonFileWithRetry<RunRecord[]>(runStorePath, []),
-    readJsonFileWithRetry<ScenarioLibrary[]>(scenarioLibraryStorePath, [])
+    readJsonFileWithRetry<ScenarioLibrary[]>(scenarioLibraryStorePath, []),
+    readJsonFileWithRetry<EnvironmentLibraryRecord[]>(environmentLibraryStorePath, []),
+    readJsonFileWithRetry<StoredCredentialLibraryRecord[]>(credentialLibraryStorePath, [])
   ]);
 
   return {
     runs: runs.map(normalizeRunRecord),
-    scenarioLibraries: scenarioLibraries.map(normalizeScenarioLibraryRecord)
+    scenarioLibraries: scenarioLibraries.map(normalizeScenarioLibraryRecord),
+    environmentLibraries: environmentLibraries.map(normalizeEnvironmentLibraryRecord),
+    credentialLibraries: credentialLibraries.map(normalizeStoredCredentialLibraryRecord)
   };
 }
 
-export function readSeedDataFromJsonStoreSync(): { runs: RunRecord[]; scenarioLibraries: ScenarioLibrary[] } {
+export function readSeedDataFromJsonStoreSync(): {
+  runs: RunRecord[];
+  scenarioLibraries: ScenarioLibrary[];
+  environmentLibraries: EnvironmentLibraryRecord[];
+  credentialLibraries: StoredCredentialLibraryRecord[];
+} {
   const runs = existsSync(runStorePath)
     ? (JSON.parse(readFileSync(runStorePath, "utf8")) as RunRecord[])
     : [];
   const scenarioLibraries = existsSync(scenarioLibraryStorePath)
     ? (JSON.parse(readFileSync(scenarioLibraryStorePath, "utf8")) as ScenarioLibrary[])
     : [];
+  const environmentLibraries = existsSync(environmentLibraryStorePath)
+    ? (JSON.parse(readFileSync(environmentLibraryStorePath, "utf8")) as EnvironmentLibraryRecord[])
+    : [];
+  const credentialLibraries = existsSync(credentialLibraryStorePath)
+    ? (JSON.parse(readFileSync(credentialLibraryStorePath, "utf8")) as StoredCredentialLibraryRecord[])
+    : [];
 
   return {
     runs: runs.map(normalizeRunRecord),
-    scenarioLibraries: scenarioLibraries.map(normalizeScenarioLibraryRecord)
+    scenarioLibraries: scenarioLibraries.map(normalizeScenarioLibraryRecord),
+    environmentLibraries: environmentLibraries.map(normalizeEnvironmentLibraryRecord),
+    credentialLibraries: credentialLibraries.map(normalizeStoredCredentialLibraryRecord)
   };
 }
 
@@ -144,6 +196,42 @@ function createJsonStoreBackend(): QaStoreBackend {
     await writeJsonAtomic(scenarioLibraryStorePath, JSON.stringify(libraries, null, 2));
   }
 
+  async function readEnvironmentLibraries(): Promise<EnvironmentLibraryRecord[]> {
+    const libraries = await readJsonFileWithRetry<EnvironmentLibraryRecord[]>(environmentLibraryStorePath, []);
+    return libraries.map(normalizeEnvironmentLibraryRecord);
+  }
+
+  async function writeEnvironmentLibraries(libraries: EnvironmentLibraryRecord[]): Promise<void> {
+    await ensureStore();
+    await writeJsonAtomic(environmentLibraryStorePath, JSON.stringify(libraries, null, 2));
+  }
+
+  async function readStoredCredentialLibraries(): Promise<StoredCredentialLibraryRecord[]> {
+    const libraries = await readJsonFileWithRetry<StoredCredentialLibraryRecord[]>(credentialLibraryStorePath, []);
+    const normalizedLibraries = libraries.map(normalizeStoredCredentialLibraryRecord);
+    const nextLibraries = normalizedLibraries.map((library) => {
+      if (library.secretMode !== "stored-secret" || !needsCredentialSecretProtection(library.password)) {
+        return library;
+      }
+
+      return normalizeStoredCredentialLibraryRecord({
+        ...library,
+        password: protectCredentialSecret(library.password)
+      });
+    });
+
+    if (JSON.stringify(nextLibraries) !== JSON.stringify(normalizedLibraries)) {
+      await writeStoredCredentialLibraries(nextLibraries);
+    }
+
+    return nextLibraries;
+  }
+
+  async function writeStoredCredentialLibraries(libraries: StoredCredentialLibraryRecord[]): Promise<void> {
+    await ensureStore();
+    await writeJsonAtomic(credentialLibraryStorePath, JSON.stringify(libraries, null, 2));
+  }
+
   async function mutateRun(runId: string, mutate: (run: RunRecord) => RunRecord): Promise<RunRecord | undefined> {
     const runs = await readRuns();
     const index = runs.findIndex((run) => run.id === runId);
@@ -160,6 +248,61 @@ function createJsonStoreBackend(): QaStoreBackend {
   }
 
   return {
+    async listEnvironmentLibraries(): Promise<EnvironmentLibraryRecord[]> {
+      return sortEnvironmentLibraries(await readEnvironmentLibraries());
+    },
+    async getEnvironmentLibrary(environmentLibraryId: string): Promise<EnvironmentLibraryRecord | undefined> {
+      const libraries = await readEnvironmentLibraries();
+      return libraries.find((library) => library.id === environmentLibraryId);
+    },
+    async upsertEnvironmentLibrary(input: EnvironmentLibraryInput, environmentLibraryId?: string): Promise<EnvironmentLibraryRecord> {
+      const libraries = await readEnvironmentLibraries();
+      const existing = environmentLibraryId ? libraries.find((library) => library.id === environmentLibraryId) : undefined;
+      const nextLibrary = buildEnvironmentLibraryRecord(existing, input, new Date().toISOString());
+      const nextLibraries = existing
+        ? libraries.map((library) => (library.id === existing.id ? nextLibrary : library))
+        : [nextLibrary, ...libraries];
+      await writeEnvironmentLibraries(nextLibraries);
+      return nextLibrary;
+    },
+    async listCredentialLibraries(): Promise<CredentialLibraryRecord[]> {
+      return sortCredentialLibraries(await readStoredCredentialLibraries()).map(sanitizeCredentialLibraryRecord);
+    },
+    async getCredentialLibrary(credentialLibraryId: string): Promise<CredentialLibraryRecord | undefined> {
+      const libraries = await readStoredCredentialLibraries();
+      const credential = libraries.find((library) => library.id === credentialLibraryId);
+      return credential ? sanitizeCredentialLibraryRecord(credential) : undefined;
+    },
+    async getStoredCredentialLibrary(credentialLibraryId: string): Promise<StoredCredentialLibraryRecord | undefined> {
+      const libraries = await readStoredCredentialLibraries();
+      return libraries.find((library) => library.id === credentialLibraryId);
+    },
+    async upsertCredentialLibrary(input: CredentialLibraryInput, credentialLibraryId?: string): Promise<CredentialLibraryRecord> {
+      const libraries = await readStoredCredentialLibraries();
+      const existing = credentialLibraryId ? libraries.find((library) => library.id === credentialLibraryId) : undefined;
+      const nextLibrary = buildStoredCredentialLibraryRecord(existing, input, new Date().toISOString());
+      const nextLibraries = existing
+        ? libraries.map((library) => (library.id === existing.id ? nextLibrary : library))
+        : [nextLibrary, ...libraries];
+      await writeStoredCredentialLibraries(nextLibraries);
+      return sanitizeCredentialLibraryRecord(nextLibrary);
+    },
+    async touchCredentialLibraryLastUsed(credentialLibraryId: string, usedAt?: string): Promise<CredentialLibraryRecord | undefined> {
+      const libraries = await readStoredCredentialLibraries();
+      const existing = libraries.find((library) => library.id === credentialLibraryId);
+
+      if (!existing) {
+        return undefined;
+      }
+
+      const nextLibrary = normalizeStoredCredentialLibraryRecord({
+        ...existing,
+        lastUsedAt: usedAt ?? new Date().toISOString()
+      });
+      const nextLibraries = libraries.map((library) => (library.id === existing.id ? nextLibrary : library));
+      await writeStoredCredentialLibraries(nextLibraries);
+      return sanitizeCredentialLibraryRecord(nextLibrary);
+    },
     async listScenarioLibraries(): Promise<ScenarioLibrary[]> {
       return sortScenarioLibraries(await readScenarioLibraries());
     },
@@ -293,7 +436,7 @@ function createJsonStoreBackend(): QaStoreBackend {
       const scenarioLibraries = await readScenarioLibraries();
       const selectedLibrary = plan.scenarioLibraryId
         ? scenarioLibraries.find((library) => library.id === plan.scenarioLibraryId)
-        : findMatchingScenarioLibrary(scenarioLibraries, plan);
+        : undefined;
       const generated = selectedLibrary
         ? {
             scenarios: selectedLibrary.scenarios,
@@ -302,13 +445,11 @@ function createJsonStoreBackend(): QaStoreBackend {
           }
         : generateScenarios(plan);
       const now = new Date().toISOString();
-      const scenarioLibrary = selectedLibrary ?? (generated.scenarios.length ? await this.upsertScenarioLibraryFromRun(plan, generated) : undefined);
-      const planWithLibrary = scenarioLibrary ? { ...plan, scenarioLibraryId: scenarioLibrary.id } : plan;
       const runRecord: RunRecord = sanitizeRunRecordContent({
         id: createId("run"),
         createdAt: now,
         updatedAt: now,
-        plan: planWithLibrary,
+        plan,
         parsedSteps: parsed.parsedSteps,
         generatedScenarios: generated.scenarios,
         status: "draft",

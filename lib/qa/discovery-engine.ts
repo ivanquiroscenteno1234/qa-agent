@@ -1,6 +1,7 @@
 import type { BrowserContext, Locator, Page } from "playwright";
 
 import { buildAnalysisReport, buildManualTestPlan, buildRunArtifacts, captureScreenshot } from "@/lib/qa/artifact-builder";
+import { hasCredentialSource } from "@/lib/qa/auth-session";
 import type { CrawlSnapshot, CrawlView } from "@/lib/qa/crawl-model";
 import { discoverNavigationCandidates } from "@/lib/qa/navigation-discovery";
 import { generateScenarios } from "@/lib/qa/scenario-generator";
@@ -423,7 +424,7 @@ export async function executeDiscoveryRun(
     });
 
     await deps.ensureRunNotCancelled(record.id);
-    if (record.plan.loginEmail && record.plan.loginPassword && (await deps.pageHasLoginForm(page))) {
+    if (hasCredentialSource(record.plan) && (await deps.pageHasLoginForm(page))) {
       const login = await deps.executeLogin(page, [], record.plan);
       const loginScreenshotArtifact = await captureScreenshot(page, record.id, 2, "Discovery Step 2");
       screenshotArtifacts.push(loginScreenshotArtifact);

@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: "Inspect local-file storage posture, inferred environments, and credential handling constraints."
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function SettingsPage() {
   return <SettingsScreen storeBackendLabel={getQaStoreBackendKind()} />;
 }

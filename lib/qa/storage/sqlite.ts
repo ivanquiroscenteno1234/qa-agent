@@ -5,6 +5,10 @@ import Database from "better-sqlite3";
 
 import type {
   Artifact,
+  CredentialLibraryInput,
+  CredentialLibraryRecord,
+  EnvironmentLibraryInput,
+  EnvironmentLibraryRecord,
   ExecutionWarning,
   GenerateScenariosResponse,
   RunEvent,
@@ -13,7 +17,8 @@ import type {
   RunStatus,
   RunSummary,
   Scenario,
-  ScenarioLibrary
+  ScenarioLibrary,
+  StoredCredentialLibraryRecord
 } from "@/lib/types";
 import { buildScenarioLibraryComparison } from "@/lib/qa/scenario-library";
 import { generateScenarios } from "@/lib/qa/scenario-generator";
@@ -21,25 +26,34 @@ import { parsePlainTextSteps } from "@/lib/qa/step-parser";
 import { readSeedDataFromJsonStoreSync } from "@/lib/qa/storage/json-store";
 import { dataDirectory, sqliteDatabasePath, sqliteMigrationsDirectory } from "@/lib/qa/storage/paths";
 import {
+  buildEnvironmentLibraryRecord,
+  buildStoredCredentialLibraryRecord,
   buildScenarioLibraryRecord,
   buildRunSummary,
   createExecutionWarning,
   createRunEvent,
   findExistingScenarioLibraryForCreate,
-  findMatchingScenarioLibrary,
   isTerminalRunStatus,
   mergeRunRecord,
+  normalizeEnvironmentLibraryRecord,
   normalizeRunRecord,
   normalizeScenarioLibraryRecord,
+  normalizeStoredCredentialLibraryRecord,
+  sanitizeCredentialLibraryRecord,
   sanitizeRunRecordContent,
+  sortCredentialLibraries,
+  sortEnvironmentLibraries,
   sortRuns,
   sortScenarioLibraries
 } from "@/lib/qa/storage/shared";
+import { needsCredentialSecretProtection, protectCredentialSecret } from "@/lib/qa/credential-secret";
 import type { QaStoreBackend, RunRecordPatch } from "@/lib/qa/storage/types";
 import { createId } from "@/lib/qa/utils";
 
 type RunRow = { id: string; payload: string };
 type ScenarioLibraryRow = { id: string; payload: string };
+type EnvironmentLibraryRow = { id: string; payload: string };
+type CredentialLibraryRow = { id: string; payload: string };
 type RunDetailsRow = {
   run_id: string;
   started_at: string | null;
@@ -841,6 +855,14 @@ function openDatabase(): Database.Database {
       for (const library of data.scenarioLibraries) {
         writeScenarioLibraryRecord(db, library);
       }
+
+      for (const environmentLibrary of data.environmentLibraries) {
+        writeEnvironmentLibraryRecord(db, environmentLibrary);
+      }
+
+      for (const credentialLibrary of data.credentialLibraries) {
+        writeStoredCredentialLibraryRecord(db, credentialLibrary);
+      }
     });
 
     seed();
@@ -856,6 +878,30 @@ function parseRunRow(row: RunRow | undefined): RunRecord | undefined {
 
 function parseScenarioLibraryRow(row: ScenarioLibraryRow | undefined): ScenarioLibrary | undefined {
   return row ? normalizeScenarioLibraryRecord(JSON.parse(row.payload) as ScenarioLibrary) : undefined;
+}
+
+function parseEnvironmentLibraryRow(row: EnvironmentLibraryRow | undefined): EnvironmentLibraryRecord | undefined {
+  return row ? normalizeEnvironmentLibraryRecord(JSON.parse(row.payload) as EnvironmentLibraryRecord) : undefined;
+}
+
+function parseCredentialLibraryRow(row: CredentialLibraryRow | undefined): StoredCredentialLibraryRecord | undefined {
+  return row ? normalizeStoredCredentialLibraryRecord(JSON.parse(row.payload) as StoredCredentialLibraryRecord) : undefined;
+}
+
+function writeEnvironmentLibraryRecord(db: Database.Database, library: EnvironmentLibraryRecord): EnvironmentLibraryRecord {
+  const normalized = normalizeEnvironmentLibraryRecord(library);
+  db.prepare(
+    "INSERT INTO environment_libraries (id, name, updated_at, payload) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, payload = excluded.payload"
+  ).run(normalized.id, normalized.name, normalized.updatedAt, JSON.stringify(normalized));
+  return normalized;
+}
+
+function writeStoredCredentialLibraryRecord(db: Database.Database, library: StoredCredentialLibraryRecord): StoredCredentialLibraryRecord {
+  const normalized = normalizeStoredCredentialLibraryRecord(library);
+  db.prepare(
+    "INSERT INTO credential_libraries (id, label, updated_at, payload) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET label = excluded.label, updated_at = excluded.updated_at, payload = excluded.payload"
+  ).run(normalized.id, normalized.label, normalized.updatedAt, JSON.stringify(normalized));
+  return normalized;
 }
 
 function createSqliteStoreBackend(): QaStoreBackend {
@@ -891,12 +937,100 @@ function createSqliteStoreBackend(): QaStoreBackend {
     return writeScenarioLibraryRecord(db, library);
   }
 
+  function listEnvironmentLibrariesInternal(): EnvironmentLibraryRecord[] {
+    const db = openDatabase();
+    const rows = db.prepare("SELECT id, payload FROM environment_libraries ORDER BY updated_at DESC").all() as EnvironmentLibraryRow[];
+    return sortEnvironmentLibraries(rows.map((row) => parseEnvironmentLibraryRow(row)).filter((library): library is EnvironmentLibraryRecord => Boolean(library)));
+  }
+
+  function getEnvironmentLibraryInternal(environmentLibraryId: string): EnvironmentLibraryRecord | undefined {
+    const db = openDatabase();
+    return parseEnvironmentLibraryRow(
+      db.prepare("SELECT id, payload FROM environment_libraries WHERE id = ?").get(environmentLibraryId) as EnvironmentLibraryRow | undefined
+    );
+  }
+
+  function writeEnvironmentLibrary(library: EnvironmentLibraryRecord): EnvironmentLibraryRecord {
+    const db = openDatabase();
+    return writeEnvironmentLibraryRecord(db, library);
+  }
+
+  function listStoredCredentialLibrariesInternal(): StoredCredentialLibraryRecord[] {
+    const db = openDatabase();
+    const rows = db.prepare("SELECT id, payload FROM credential_libraries ORDER BY updated_at DESC").all() as CredentialLibraryRow[];
+    return sortCredentialLibraries(rows.map((row) => parseCredentialLibraryRow(row)).filter((library): library is StoredCredentialLibraryRecord => Boolean(library)));
+  }
+
+  function getStoredCredentialLibraryInternal(credentialLibraryId: string): StoredCredentialLibraryRecord | undefined {
+    const db = openDatabase();
+    return parseCredentialLibraryRow(
+      db.prepare("SELECT id, payload FROM credential_libraries WHERE id = ?").get(credentialLibraryId) as CredentialLibraryRow | undefined
+    );
+  }
+
+  function writeStoredCredentialLibrary(library: StoredCredentialLibraryRecord): StoredCredentialLibraryRecord {
+    const db = openDatabase();
+    return writeStoredCredentialLibraryRecord(db, library);
+  }
+
+  function protectStoredCredentialLibrary(library: StoredCredentialLibraryRecord | undefined): StoredCredentialLibraryRecord | undefined {
+    if (!library || library.secretMode !== "stored-secret" || !needsCredentialSecretProtection(library.password)) {
+      return library;
+    }
+
+    return writeStoredCredentialLibrary({
+      ...library,
+      password: protectCredentialSecret(library.password)
+    });
+  }
+
   function mutateRun(runId: string, mutate: (run: RunRecord) => RunRecord): RunRecord | undefined {
     const existing = getRunInternal(runId);
     return existing ? writeRun(mutate(existing)) : undefined;
   }
 
   return {
+    async listEnvironmentLibraries(): Promise<EnvironmentLibraryRecord[]> {
+      return listEnvironmentLibrariesInternal();
+    },
+    async getEnvironmentLibrary(environmentLibraryId: string): Promise<EnvironmentLibraryRecord | undefined> {
+      return getEnvironmentLibraryInternal(environmentLibraryId);
+    },
+    async upsertEnvironmentLibrary(input: EnvironmentLibraryInput, environmentLibraryId?: string): Promise<EnvironmentLibraryRecord> {
+      const existing = environmentLibraryId ? getEnvironmentLibraryInternal(environmentLibraryId) : undefined;
+      return writeEnvironmentLibrary(buildEnvironmentLibraryRecord(existing, input, new Date().toISOString()));
+    },
+    async listCredentialLibraries(): Promise<CredentialLibraryRecord[]> {
+      return listStoredCredentialLibrariesInternal()
+        .map((library) => protectStoredCredentialLibrary(library) ?? library)
+        .map(sanitizeCredentialLibraryRecord);
+    },
+    async getCredentialLibrary(credentialLibraryId: string): Promise<CredentialLibraryRecord | undefined> {
+      const credential = protectStoredCredentialLibrary(getStoredCredentialLibraryInternal(credentialLibraryId));
+      return credential ? sanitizeCredentialLibraryRecord(credential) : undefined;
+    },
+    async getStoredCredentialLibrary(credentialLibraryId: string): Promise<StoredCredentialLibraryRecord | undefined> {
+      return protectStoredCredentialLibrary(getStoredCredentialLibraryInternal(credentialLibraryId));
+    },
+    async upsertCredentialLibrary(input: CredentialLibraryInput, credentialLibraryId?: string): Promise<CredentialLibraryRecord> {
+      const existing = credentialLibraryId ? getStoredCredentialLibraryInternal(credentialLibraryId) : undefined;
+      const credential = writeStoredCredentialLibrary(buildStoredCredentialLibraryRecord(existing, input, new Date().toISOString()));
+      return sanitizeCredentialLibraryRecord(credential);
+    },
+    async touchCredentialLibraryLastUsed(credentialLibraryId: string, usedAt?: string): Promise<CredentialLibraryRecord | undefined> {
+      const existing = getStoredCredentialLibraryInternal(credentialLibraryId);
+
+      if (!existing) {
+        return undefined;
+      }
+
+      const credential = writeStoredCredentialLibrary({
+        ...existing,
+        lastUsedAt: usedAt ?? new Date().toISOString()
+      });
+
+      return sanitizeCredentialLibraryRecord(credential);
+    },
     async listScenarioLibraries(): Promise<ScenarioLibrary[]> {
       return listScenarioLibrariesInternal();
     },
@@ -1023,18 +1157,16 @@ function createSqliteStoreBackend(): QaStoreBackend {
       const scenarioLibraries = listScenarioLibrariesInternal();
       const selectedLibrary = plan.scenarioLibraryId
         ? scenarioLibraries.find((library) => library.id === plan.scenarioLibraryId)
-        : findMatchingScenarioLibrary(scenarioLibraries, plan);
+        : undefined;
       const generated = selectedLibrary
         ? { scenarios: selectedLibrary.scenarios, coverageGaps: selectedLibrary.coverageGaps, riskSummary: selectedLibrary.riskSummary }
         : generateScenarios(plan);
       const now = new Date().toISOString();
-      const scenarioLibrary = selectedLibrary ?? (generated.scenarios.length ? await this.upsertScenarioLibraryFromRun(plan, generated) : undefined);
-      const planWithLibrary = scenarioLibrary ? { ...plan, scenarioLibraryId: scenarioLibrary.id } : plan;
       return writeRun(sanitizeRunRecordContent({
         id: createId("run"),
         createdAt: now,
         updatedAt: now,
-        plan: planWithLibrary,
+        plan,
         parsedSteps: parsed.parsedSteps,
         generatedScenarios: generated.scenarios,
         status: "draft",

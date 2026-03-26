@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import type { Artifact } from "@/lib/types";
 
 interface ArtifactReviewProps {
@@ -169,10 +171,13 @@ function renderCrawlPreview(artifact: Artifact) {
 function renderPreview(runId: string, artifact: Artifact) {
   if (artifact.type === "screenshot") {
     return (
-      <img
+      <Image
         className="artifact-image-preview"
         src={`/api/runs/${runId}/artifacts/${artifact.id}`}
         alt={artifact.label}
+        width={1600}
+        height={900}
+        sizes="(max-width: 1100px) 100vw, 50vw"
       />
     );
   }

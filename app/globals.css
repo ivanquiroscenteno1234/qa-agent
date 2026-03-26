@@ -260,7 +260,7 @@ a {
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: end;
+  align-items: flex-end;
   gap: 18px;
 }
 
@@ -375,7 +375,7 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: end;
+  align-items: flex-end;
   padding: 18px 20px 14px;
   border-bottom: 1px solid rgba(175, 179, 176, 0.18);
 }
@@ -409,7 +409,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  align-items: end;
+  align-items: flex-end;
   padding: 16px 18px;
   border-radius: 18px;
   border: 1px solid rgba(175, 179, 176, 0.22);
@@ -428,7 +428,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .filter-bar-controls label {
@@ -458,7 +458,7 @@ a {
 }
 
 .draft-parameter-grid {
-  align-items: end;
+  align-items: flex-end;
 }
 
 .draft-state-strip {
@@ -513,7 +513,7 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: end;
+  align-items: flex-end;
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(175, 179, 176, 0.18);
 }
@@ -551,7 +551,7 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .monitor-run-card-topline p,
@@ -598,7 +598,7 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 14px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .monitor-detail-header h3 {
@@ -631,7 +631,7 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .monitor-console-list {
@@ -705,7 +705,7 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .review-summary-header h3 {
@@ -812,7 +812,7 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 14px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .scenario-library-card-header h3 {
@@ -911,7 +911,7 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .settings-card-header h3 {
@@ -1214,6 +1214,26 @@ a {
   font-size: 0.93rem;
 }
 
+.field-label-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.field-required-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 63, 24, 0.22);
+  background: rgba(230, 186, 102, 0.12);
+  color: var(--warning);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .field-hint {
   color: var(--warning);
   font-size: 0.8rem;
@@ -1238,6 +1258,18 @@ textarea,
   background: rgba(255, 251, 244, 0.9);
   padding: 12px 14px;
   color: var(--ink);
+}
+
+.field-control-invalid {
+  border-color: rgba(167, 46, 46, 0.55);
+  background: rgba(209, 89, 89, 0.08);
+  box-shadow: 0 0 0 3px rgba(167, 46, 46, 0.12);
+}
+
+.field-control-invalid:focus {
+  outline: none;
+  border-color: rgba(167, 46, 46, 0.72);
+  box-shadow: 0 0 0 4px rgba(167, 46, 46, 0.16);
 }
 
 textarea {
@@ -1572,6 +1604,7 @@ textarea {
 .artifact-image-preview {
   display: block;
   width: 100%;
+  height: auto;
   margin-top: 14px;
   border-radius: 14px;
   border: 1px solid var(--line);
@@ -1658,7 +1691,9 @@ textarea {
 }
 
 .timeline-evidence-image {
+  display: block;
   width: 100%;
+  height: auto;
   border-radius: 12px;
   border: 1px solid var(--line);
   background: white;
