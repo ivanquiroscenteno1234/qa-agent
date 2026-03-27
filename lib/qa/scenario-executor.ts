@@ -1,6 +1,7 @@
 import type { BrowserContext, Locator, Page } from "playwright";
 
 import { buildRunArtifacts, captureScreenshot } from "@/lib/qa/artifact-builder";
+import type { AuthStateOutcome } from "@/lib/qa/auth-session";
 import { discoverNavigationCandidates } from "@/lib/qa/navigation-discovery";
 import { buildDefects, buildTerminalRunRecord, createSyntheticStepResult } from "@/lib/qa/result-builder";
 import type { FailureCategory, RunPlan, RunRecord, Scenario, StepResult, StepStatus } from "@/lib/types";
@@ -13,7 +14,7 @@ interface ScenarioExecutorDependencies {
   firstVisibleByPatterns: (page: Page, patterns: string[]) => Promise<Locator | null>;
   findFirstVisible: (locator: Locator) => Promise<Locator | null>;
   pageHasLoginForm: (page: Page) => Promise<boolean>;
-  ensureAuthenticatedState: (page: Page, plan: RunPlan) => Promise<string>;
+  ensureAuthenticatedState: (page: Page, plan: RunPlan) => Promise<AuthStateOutcome>;
   buildProtectedRouteUrl: (plan: RunPlan) => string;
   ensureRunNotCancelled: (runId: string) => Promise<void>;
   emitEvent: (
@@ -196,7 +197,8 @@ async function executeScenarioCheck(
     };
   }
 
-  const authNote = await deps.ensureAuthenticatedState(page, plan);
+  const authState = await deps.ensureAuthenticatedState(page, plan);
+  const authNote = authState.notes;
   const currentCandidates = await discoverNavigationCandidates(page, deps);
   const scenarioText = deps.normalizeText(`${scenario.title} ${scenario.steps.join(" ")} ${scenario.expectedResult}`);
   const matchedTargets = currentCandidates.filter((candidate: string) => scenarioText.includes(deps.normalizeText(candidate))).slice(0, 3);

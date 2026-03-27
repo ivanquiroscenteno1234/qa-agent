@@ -4,7 +4,7 @@ export async function discoverNavigationCandidates(
   page: Page,
   deps: { cleanLabel: (value: string) => string; selectDiscoveryLabels: (values: string[], limit: number) => string[] }
 ): Promise<string[]> {
-  const navigationLocator = page.locator('nav button, nav a, aside button, aside a, [role="navigation"] button, [role="navigation"] a');
+  const navigationLocator = page.locator('nav button, nav a, [role="navigation"] button, [role="navigation"] a');
   const fallbackLocator = page.locator('button, a, [role="button"], [role="link"]');
   const source = (await navigationLocator.count()) > 0 ? navigationLocator : fallbackLocator;
   const count = await source.count();
@@ -17,7 +17,15 @@ export async function discoverNavigationCandidates(
     }
 
     const text = deps.cleanLabel((await candidate.textContent()) ?? "");
+    const role = await candidate.getAttribute("role").catch(() => null);
+    const hasPopup = await candidate.getAttribute("aria-haspopup").catch(() => null);
+    const expanded = await candidate.getAttribute("aria-expanded").catch(() => null);
+
     if (!text || text.length < 3) {
+      continue;
+    }
+
+    if (role === "combobox" || hasPopup === "listbox" || expanded === "true") {
       continue;
     }
 

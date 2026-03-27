@@ -419,7 +419,7 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
     }
 
     let disposed = false;
-    let activeController: AbortController | null = null;
+    const shouldFetchEvents = Boolean(selectedRunSummary && isActiveRun(selectedRunSummary.status));
 
     const loadRunState = async () => {
       if (disposed || pollInFlightRef.current) {
@@ -427,15 +427,11 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
       }
 
       pollInFlightRef.current = true;
-      activeController = new AbortController();
 
       try {
-        const [runResponse, eventsResponse] = await Promise.all([
-          fetch(`/api/runs/${selectedRunId}`, { cache: "no-store", signal: activeController.signal }),
-          fetch(`/api/runs/${selectedRunId}/events`, { cache: "no-store", signal: activeController.signal })
-        ]);
+        const runResponse = await fetch(`/api/runs/${selectedRunId}`, { cache: "no-store" });
 
-        if (disposed || activeController.signal.aborted) {
+        if (disposed) {
           return;
         }
 
@@ -443,6 +439,20 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
           const runData = (await runResponse.json()) as { run: RunRecord };
           setSelectedRun(runData.run);
           setRuns((current) => upsertAndSortRuns(current, summarizeRun(runData.run)));
+
+          if (!shouldFetchEvents) {
+            setRunEvents([]);
+            setRunWarnings([]);
+          }
+        }
+
+        if (!shouldFetchEvents || disposed) {
+          return;
+        }
+
+        const eventsResponse = await fetch(`/api/runs/${selectedRunId}/events`, { cache: "no-store" });
+        if (disposed) {
+          return;
         }
 
         if (eventsResponse.ok) {
@@ -451,7 +461,7 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
           setRunWarnings(eventData.warnings);
         }
       } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError") && !disposed) {
+        if (!disposed) {
           setFeedback((current) => current.startsWith("Unable to refresh") ? current : "Unable to refresh live run status. Retrying automatically.");
         }
       } finally {
@@ -464,7 +474,6 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
     if (!selectedRunSummary || !isActiveRun(selectedRunSummary.status)) {
       return () => {
         disposed = true;
-        activeController?.abort();
       };
     }
 
@@ -475,7 +484,6 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
     return () => {
       disposed = true;
       window.clearInterval(intervalId);
-      activeController?.abort();
       pollInFlightRef.current = false;
     };
   }, [selectedRunId, selectedRunSummary]);

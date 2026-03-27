@@ -53,7 +53,8 @@ export function revealCredentialSecret(value?: string): string | undefined {
     return trimmedValue;
   }
 
-  const [, encodedIv, encodedAuthTag, encodedCiphertext] = trimmedValue.split(":");
+  const encodedPayload = trimmedValue.slice(SECRET_PREFIX.length);
+  const [encodedIv, encodedAuthTag, encodedCiphertext] = encodedPayload.split(":");
 
   if (!encodedIv || !encodedAuthTag || !encodedCiphertext) {
     throw new Error("Stored credential secret is malformed and cannot be decrypted.");

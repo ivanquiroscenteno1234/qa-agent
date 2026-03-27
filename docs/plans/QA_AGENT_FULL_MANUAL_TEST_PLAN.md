@@ -16,6 +16,41 @@ This plan is written against the current application behavior in this repository
 
 These credentials are included because they were explicitly provided for testing and are intended to be used to seed the app's saved environment and credential profile flows during the manual QA process.
 
+## Executive Findings Report
+
+### Current Outcome
+
+- Manual QA coverage is complete for all `67` planned test-case ids.
+- The QA campaign logged `8` additional retest entries on top of the first-pass coverage.
+- End-to-end exploratory execution now passes against `https://restaurant-partner-p-dev.onrender.com` with both:
+  - inline credentials
+  - saved credential profiles
+
+### Final Root Cause
+
+- The final blocker was not the target account.
+- The real defect was local to the QA Agent saved-secret path in `lib/qa/credential-secret.ts`.
+- `revealCredentialSecret()` was parsing encrypted secrets incorrectly by splitting the full `enc:v1:...` value instead of stripping the prefix before decoding the payload segments.
+- After fixing that parser and rebuilding, saved-profile exploratory runs passed.
+
+### Final Verification State
+
+- Direct target login with `ivanquiroscenteno@gmail.com` and `ZXCVfdsaQWER1234@` succeeded.
+- Inline exploratory run verification passed.
+- Saved-credential exploratory verification passed.
+- Draft-to-Monitor operator flow with saved profiles passed on the rebuilt app at `http://127.0.0.1:3022`.
+
+### Remaining Open Items
+
+- Residual low-severity route-transition abort chatter can still appear during page changes.
+- Credential and evidence cleanup still lack a targeted delete path, so temporary QA records remain unless the store is wiped again.
+
+### Reader Guide
+
+- The standalone final deliverable is `docs/plans/QA_AGENT_FINAL_FINDINGS_REPORT_2026-03-26.md`.
+- The sections below retain the full chronological QA campaign record.
+- Where older findings conflict with the final verified state, the later re-test and fix-verification sections supersede the earlier entries.
+
 ## Test Objectives
 
 1. Validate every user-facing workflow in the QA Agent app.
@@ -84,6 +119,8 @@ Create these saved records first so later scenarios can reuse them.
 ### Seed Credential Profile
 
 - Credential Profile Label: `Restaurant Partner Admin`
+- Username: `ivanquiroscenteno@gmail.com`
+- Password: `ZXCVfdsaQWER1234@`
 - Secret Mode: `stored-secret`
 - Status: `active`
 - Reference: optional
@@ -1049,7 +1086,9 @@ The manual QA effort is complete when:
 
 This plan now assumes the local QA Agent store has already been fully wiped before execution begins. All profile creation, scenario-library creation, run creation, monitoring, review, and reporting steps should therefore be executed from scratch within the same test campaign.
 
-## Execution Log - 2026-03-25
+## Appendix - Detailed Execution History
+
+### Execution Log - 2026-03-25
 
 ### Test Session Metadata
 
@@ -1331,7 +1370,7 @@ This plan now assumes the local QA Agent store has already been fully wiped befo
 - The Draft `Credential Reference` free-text field auto-populated with the saved credential label after credential save. This did not block the workflow, but it may be a confusing UX side effect because the field implies a user-entered external reference handle.
 - Draft reload behavior shows a temporary empty bootstrap state before client hydration restores saved profile options. This resolved correctly and did not cause data loss during this execution segment.
 
-## Execution Log Continuation - 2026-03-25
+### Execution Log Continuation - 2026-03-25
 
 ### Validation Fix Verification
 
@@ -1516,7 +1555,7 @@ This plan now assumes the local QA Agent store has already been fully wiped befo
 
 - The generated scenario content uses generic labels like `The Active Orders Area` when the source steps do not explicitly name a concrete screen object. This did not break library save or update, but it remains a content-quality observation for scenario generation.
 
-## Execution Log Continuation - 2026-03-26
+### Execution Log Continuation - 2026-03-26
 
 ### Additional Executed Success Cases
 
@@ -1719,7 +1758,7 @@ This plan now assumes the local QA Agent store has already been fully wiped befo
 - Repeated `GET /api/runs/[runId]/events` polling requests surfaced in the browser as `net::ERR_ABORTED` during active-run monitoring, even while the UI still updated. This looks like transport or polling-noise rather than a total feed outage, but it should be documented for later resilience testing.
 - The Monitor and Review workflows auto-shift quickly as runs terminate. This is useful, but it narrows the manual window to click `Cancel Run` from the UI on short-lived executions.
 
-## Execution Log Continuation - 2026-03-26
+### Execution Log Continuation - 2026-03-26
 
 ### Additional Executed Success Cases
 
@@ -1955,7 +1994,7 @@ This plan now assumes the local QA Agent store has already been fully wiped befo
 - `TC-103 Save Run As Library Or Update Linked Library` was only partially exercised in this segment. Review correctly exposed `Update Linked Library` for the library-linked failed run, but the unlinked review-side save path was not re-executed in this pass.
 - The first attempted Phase 12 scenario-library negative requests were too malformed to reach the route's domain-specific validation branches. After switching to schema-valid payloads, both targeted domain errors were confirmed successfully.
 
-## Execution Log Continuation - 2026-03-26
+### Execution Log Continuation - 2026-03-26
 
 ### Additional Executed Success Cases
 
@@ -2022,7 +2061,7 @@ This plan now assumes the local QA Agent store has already been fully wiped befo
 - The open `/library` page continued to show `2` saved libraries until the route was reloaded, even though `GET /api/scenario-libraries` had already returned the newly auto-created third library. After reload, the Library page reconciled correctly to `3 saved`.
 - The new exploratory run `run_u28g1rzc` reproduced the same high-level runtime failure pattern seen in the earlier exploratory run: it reached `fail` during reporting, still produced screenshots and artifacts, and ended with `Discovery reporting failed unexpectedly.`
 
-## Execution Log Continuation - 2026-03-26
+### Execution Log Continuation - 2026-03-26
 
 ### Validation Fix Verification
 
@@ -2070,3 +2109,638 @@ This plan now assumes the local QA Agent store has already been fully wiped befo
 ### Additional Open Observations
 
 - The exploratory runtime defect itself remains unresolved. The new unlinked run stayed in `draft` for this review-save-path re-test, while the earlier linked exploratory runs still fail during reporting against the Restaurant Partner target.
+
+### Execution Log Continuation - 2026-03-26
+
+### Runtime Diagnosis Update
+
+#### FAIL - TC-093 Exploratory Login And Discovery End To End Re-Test After Protected-Route Auth Probe
+
+- Preconditions:
+  - Protected-route auth-session probe fix had been applied.
+  - Fresh app instance launched on `http://127.0.0.1:3016`.
+- Steps performed:
+  1. Created exploratory run `run_z8wwcks0` against `Restaurant Partner Staging` with the saved credential profile.
+  2. Allowed the run to queue and complete.
+  3. Queried `GET /api/runs/run_z8wwcks0` and inspected step results and artifacts.
+- Actual result:
+  - The run still ended in terminal state `fail`.
+  - Final phase remained `reporting` with `Discovery reporting failed unexpectedly.`
+  - Step 2 still failed with `observedTarget=https://restaurant-partner-p-dev.onrender.com/login` and `actionResult=Unsupported state or unable to authenticate data`.
+  - The crawl artifact content remained empty.
+- Expected result:
+  - The protected-route auth probe should have prevented the exploratory crawl from falling back to `/login`.
+- Status: Fail
+- Severity: High
+- Error / finding:
+  - The protected-route auth probe alone did not resolve the exploratory discovery failure.
+
+### Root-Cause Investigation Notes
+
+- Manual browser reproduction against the live Restaurant Partner target confirmed that the provided credentials still authenticate successfully to `https://restaurant-partner-p-dev.onrender.com/home/dashboard`.
+- The exploratory crawler was reproducing a separate interaction defect: it treated the sidebar branch selector `Todas las Sucursales` as a discovery-navigation candidate because the collector accepted generic `aside button` elements.
+- Once the crawler clicked that selector, the resulting listbox stayed open and intercepted later clicks, which corrupted subsequent crawl navigation.
+- A product fix was applied in the QA Agent codebase to:
+  - restrict discovery navigation candidates to actual navigation containers instead of generic sidebar buttons
+  - skip combobox or popup-trigger controls during discovery candidate collection
+  - dismiss transient overlays before each crawl click
+
+### Validation Blocker
+
+- A full post-fix end-to-end re-test is currently blocked by a separate local Next.js runtime/build issue unrelated to the crawl logic itself.
+- After clearing `.next` to force a clean rebuild, `npm.cmd run build` failed with:
+  - `ENOENT: no such file or directory, rename ... .next\export\500.html -> .next\server\pages\500.html`
+- A fresh dev instance on `3017` also produced `.next` manifest and route-file `ENOENT` errors when starting run APIs after the clean-output reset.
+- Because of that local runtime instability, the new crawl fix has not yet been validated through a fresh full QA Agent exploratory run.
+
+### Additional Open Observations
+
+- The latest evidence suggests the exploratory defect is not just a credential or auth-probe issue; discovery-navigation candidate selection was also contributing to crawl instability.
+- `TC-142 Stale Polling Noise Observation` was not re-verified in a clean full run after the latest crawl fix because the local runtime became unstable during the rebuild attempt.
+
+### Execution Log Continuation - 2026-03-26
+
+### Validation Environment Recovery
+
+#### PASS - Local Build Stability Recovered For Re-Testing
+
+- Preconditions:
+  - The earlier redirected clean rebuild had failed while regenerating `.next` artifacts.
+- Steps performed:
+  1. Re-ran `npm.cmd run build` directly without the redirected PowerShell clean-build wrapper.
+  2. Verified a complete successful production build.
+  3. Launched fresh production instances from the successful build on `3018`, `3019`, and `3020` for isolated retests.
+- Actual result:
+  - Direct production builds completed successfully and emitted the full Next.js route manifest.
+  - Fresh production instances launched cleanly and served API traffic.
+- Expected result:
+  - The QA Agent app should be re-testable from a stable production build.
+- Status: Pass
+- Notes:
+  - The earlier `.next` failure appears tied to the specific clean-build command path rather than a persistent product build regression.
+
+### External Runtime Diagnosis
+
+#### FAIL - TC-093 Exploratory Login And Discovery End To End Re-Test After Crawl Candidate Fix
+
+- Preconditions:
+  - Discovery candidate fix applied so sidebar branch selector controls are no longer treated as crawl navigation.
+  - Fresh production instance launched on `http://127.0.0.1:3018`.
+- Steps performed:
+  1. Created and started exploratory run `run_4my8qopx`.
+  2. Polled the final run payload and inspected step results and artifacts.
+- Actual result:
+  - The run still ended with status `fail` in phase `reporting`.
+  - The run still fell through to `https://restaurant-partner-p-dev.onrender.com/login` during step 2.
+  - No successful login step was recorded yet, and the crawl artifact remained empty.
+- Expected result:
+  - The crawl candidate fix should have prevented selector-interference from being the sole cause of the exploratory failure.
+- Status: Fail
+- Severity: High
+- Error / finding:
+  - The crawl candidate fix removed one concrete instability, but it did not resolve the underlying automated authentication failure.
+
+#### FAIL - Target Rejects Playwright-Driven Login Despite Manual Credential Success
+
+- Preconditions:
+  - Direct Playwright reproduction was run outside the QA Agent app using the same target URL and credentials.
+- Steps performed:
+  1. Opened `https://restaurant-partner-p-dev.onrender.com/login` in a clean Playwright Chromium session.
+  2. Confirmed the login form was detectable by label, placeholder, and selector-based heuristics.
+  3. Submitted the provided credentials in both headless and headed Playwright sessions.
+  4. Repeated the repro with basic anti-automation masking and keyboard-style typing.
+- Actual result:
+  - In all Playwright-driven repro paths, the target remained on `/login`.
+  - The page showed `Correo o contraseña incorrectos. Inténtalo de nuevo.` after submission.
+  - This happened in both headed and headless Playwright, including keyboard typing and basic stealth masking.
+- Expected result:
+  - The same valid credentials should authenticate in the automated runtime if the target supports browser automation for login.
+- Status: Fail
+- Severity: High
+- Error / finding:
+  - The live Restaurant Partner target is rejecting Playwright-driven automated login even though manual browser login had previously succeeded.
+- Notes:
+  - This strongly suggests the remaining exploratory failure is driven by target-side automation rejection rather than only by QA Agent crawl logic.
+
+### Diagnostics Improvement Verification
+
+#### PASS - Exploratory Run Now Records Authentication Failure As A Separate Step
+
+- Preconditions:
+  - QA Agent auth diagnostics were updated so exploratory discovery records authentication as its own step and preserves auth-stage failure evidence.
+  - Fresh production instance launched on `http://127.0.0.1:3020`.
+- Steps performed:
+  1. Created and started exploratory run `run_vi8qrlfr`.
+  2. Polled the final run payload after completion.
+  3. Inspected step results and artifacts.
+- Actual result:
+  - The run now records three steps instead of collapsing directly to a generic crawl failure.
+  - Step 2 is now a dedicated failed login step: `Authenticate with the supplied discovery credentials.`
+  - Step 2 notes explicitly say: `The exploratory run could not establish an authenticated session before crawling.`
+  - The final crawl failure still occurs afterward on `/login`, but the auth-stage evidence is now visible and separable from the downstream crawl failure.
+- Expected result:
+  - When the target rejects automated authentication, Review and API consumers should see a dedicated failed auth step before the crawl failure.
+- Status: Pass
+- Notes:
+  - The step action text is still generic in `actionResult`, but the run now exposes the auth-stage failure boundary clearly enough for triage.
+
+### Additional Open Observations
+
+- The remaining exploratory blocker appears to be target-side rejection of Playwright-driven login, not only QA Agent crawl instability.
+- The crawl-selector fix remains valuable because it removed one confirmed source of interaction corruption, but it does not by itself restore end-to-end discovery success against this target.
+- `TC-142 Stale Polling Noise Observation` still has not been re-run in a fresh active-run session after the latest auth-diagnostics changes.
+
+### Execution Log Continuation - 2026-03-26
+
+### Target Behavior Investigation
+
+#### FAIL - Direct Target Login API Probe With Provided Credentials
+
+- Historical note:
+  - This finding is superseded by the later `Credential Correction Re-Test` section, which verified that the current document credential `ZXCVfdsaQWER1234@` authenticates successfully.
+
+- Preconditions:
+  - Target login page reachable at `https://restaurant-partner-p-dev.onrender.com/login`.
+  - Investigation run executed outside QA Agent workflow to isolate target behavior.
+- Steps performed:
+  1. Reproduced the target login flow directly in a clean browser session.
+  2. Captured the actual authentication network request.
+  3. Tested both credential variants that had appeared during the QA campaign:
+     - `zxcvFDSAqwer1234@`
+     - `ZXCVfdsaQWER1234@@`
+  4. Observed the target UI response and backend response payload.
+- Actual result:
+  - Both attempts submitted `POST https://fast-eat-api-nestjs-dev.onrender.com/api/auth/login`.
+  - Both attempts returned `401 Unauthorized`.
+  - Backend response body was:
+    - `{"success":false,"error":"Unauthorized","message":"Email o contraseña incorrectos. Verifica tus credenciales.",...}`
+  - The target UI remained on `/login` and showed `Correo o contraseña incorrectos. Inténtalo de nuevo.`
+- Expected result:
+  - At least one of the provided credential variants should authenticate successfully if the target account is still valid.
+- Status: Fail
+- Severity: High
+- Error / finding:
+  - The target authentication API currently rejects both credential variants used during this QA campaign.
+- Notes:
+  - This is stronger evidence than the earlier exploratory-run symptoms because it isolates the target's own auth API behavior from the QA Agent runtime.
+
+#### Observation - Earlier Interactive Login Success Could Not Be Reproduced
+
+- A later re-check in the integrated browser no longer reproduced the earlier apparent successful login path.
+- The same UI flow now also returns `401` with `INVALID_CREDENTIALS` messaging in the browser console.
+- The most defensible current interpretation is that the earlier apparent success was caused by stale or transient target-side state rather than a durable valid automated login path.
+
+### Updated Conclusion
+
+- The current blocker for `TC-093` is no longer best described only as "Playwright-driven login rejection."
+- The stronger current finding is that the target's own login API rejects the credential data available to this test campaign.
+- QA Agent-side diagnostics are now clearer, but the exploratory run cannot pass against this target until working credentials or an alternate valid test account are available.
+
+### Execution Log Continuation - 2026-03-26
+
+### Remaining Draft, API, And Polling Coverage
+
+#### PASS - TC-025 Execute And Expand Requires Seed Steps
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+  - Saved environment `Restaurant Partner Staging` available.
+- Steps performed:
+  1. Opened `/draft`.
+  2. Switched `Mode` to `Execute And Expand`.
+  3. Cleared `Plain-Text Steps`.
+  4. Observed `Generate Scenarios` and `Create Run`.
+- Actual result:
+  - Both actions remained disabled.
+  - The Draft UI showed the seed-step requirement as the blocker.
+- Expected result:
+  - Both actions should remain disabled until seed steps are supplied.
+- Status: Pass
+- Notes:
+  - The current UI wording is consistent with the intended gate for `Execute And Expand` mode.
+
+#### PASS - TC-029 Free-Text Field Tolerance Matrix
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+  - Draft screen loaded with saved environment and credential profiles available.
+- Steps performed:
+  1. Entered long, punctuated, and multiline values into representative optional text fields on Draft.
+  2. Switched between fields that feed environment, objective, acceptance, cleanup, and risk text.
+  3. Observed UI stability and field persistence while editing.
+- Actual result:
+  - The Draft form accepted the tested optional text values without crashing or corrupting the layout.
+  - No client-side sanitization or format enforcement was surfaced for the sampled optional fields.
+- Expected result:
+  - Optional free-text fields should tolerate arbitrary operator notes without breaking the screen.
+- Status: Pass
+- Notes:
+  - This confirms tolerance behavior for representative optional fields; it does not add any new sanitization guarantee beyond current UI behavior.
+
+#### PASS - TC-030 Timebox Minutes Boundary Behavior
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+  - Saved environment and credential profiles available for direct API run creation checks.
+- Steps performed:
+  1. Tested Draft UI entry values `0`, `1`, `5`, `60`, and `61` in `Timebox Minutes`.
+  2. Submitted direct `POST /api/runs` requests with `timeboxMinutes` values `0`, `1`, `60`, `61`, `-5`, and `1.5`.
+  3. Compared UI behavior against API validation behavior.
+- Actual result:
+  - The Draft UI coerced `0` back to `20`.
+  - The Draft input displayed `1`, `5`, `60`, and `61` without a client-side max-range rejection.
+  - The API rejected `0` and `-5` with `INVALID_REQUEST` and `Number must be greater than 0`.
+  - The API rejected `1.5` with `INVALID_REQUEST` and `Expected integer, received float`.
+  - The API accepted `1`, `60`, and `61`, creating valid draft runs.
+- Expected result:
+  - Current behavior should be documented across both UI and API because the implementation enforces positive-integer validation, not a strict `60` minute maximum.
+- Status: Pass
+- Notes:
+  - This test confirms a documentation/UX gap rather than a runtime defect: `61` is currently accepted server-side.
+
+#### PASS - TC-040 Environment Profile Save Requires Name
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+- Steps performed:
+  1. Opened `/draft`.
+  2. Cleared `Environment Profile Name`.
+  3. Observed `Save Environment`.
+- Actual result:
+  - `Save Environment` stayed disabled.
+  - The UI surfaced the missing-name reason.
+- Expected result:
+  - Environment save should remain blocked when the profile name is blank.
+- Status: Pass
+
+#### PASS - TC-041 Environment Profile Save Requires Target URL
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+- Steps performed:
+  1. Opened `/draft`.
+  2. Cleared `Target URL` while attempting an environment-profile save.
+  3. Observed `Save Environment`.
+- Actual result:
+  - `Save Environment` stayed disabled.
+  - The UI explained that a target URL is required.
+- Expected result:
+  - Environment save should remain blocked when the target URL is blank.
+- Status: Pass
+
+#### PASS - TC-043 Environment Profile Update Persists
+
+- Preconditions:
+  - Existing saved environment id `environment_library_1r1u2rhj` present.
+  - Production instance running at `http://127.0.0.1:3021`.
+- Steps performed:
+  1. Sent `PATCH /api/environments/environment_library_1r1u2rhj` updating `role` from `Admin` to `Supervisor`.
+  2. Verified the updated payload and `updatedAt` timestamp.
+  3. Restored the same environment profile back to `Admin`.
+- Actual result:
+  - The environment update persisted successfully.
+  - The restored `Admin` value also persisted successfully.
+- Expected result:
+  - Environment edits should persist and remain reversible through the current API.
+- Status: Pass
+- Notes:
+  - The seed environment was restored to `Admin` to avoid contaminating later runs.
+
+#### PASS - TC-044 Credential Profile Save Requires Label
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+- Steps performed:
+  1. Opened `/draft`.
+  2. Cleared `Credential Profile Label`.
+  3. Observed `Save Credential`.
+- Actual result:
+  - `Save Credential` stayed disabled.
+  - The Draft UI surfaced the missing-label reason.
+- Expected result:
+  - Credential save should remain blocked when the label is blank.
+- Status: Pass
+
+#### PASS - TC-045 Credential Profile Save Requires Username
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+  - Saved credential selection cleared so Draft validation used inline credential fields.
+- Steps performed:
+  1. Deselected the saved credential profile.
+  2. Left `Login Email` blank.
+  3. Entered a password state that otherwise satisfied the secret-mode requirement.
+  4. Observed `Save Credential`.
+- Actual result:
+  - `Save Credential` stayed disabled.
+  - The UI surfaced the missing-username reason.
+- Expected result:
+  - Credential save should remain blocked when username/email is blank.
+- Status: Pass
+
+#### PASS - TC-046 Credential Profile Save Requires Secret Data
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+  - Saved credential selection cleared so Draft validation used inline credential fields.
+- Steps performed:
+  1. Deselected the saved credential profile.
+  2. Left both password and reference blank.
+  3. Observed `Save Credential`.
+- Actual result:
+  - `Save Credential` stayed disabled.
+  - The UI surfaced the missing-secret requirement.
+- Expected result:
+  - Credential save should remain blocked when neither password nor reference is supplied.
+- Status: Pass
+
+#### PASS - TC-047 Credential Profile Create Via API
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+- Steps performed:
+  1. Sent `POST /api/credentials` with a new stored-secret payload for a temporary QA profile.
+  2. Verified the created response payload and presence in the credential inventory.
+- Actual result:
+  - A new credential profile was created successfully with id `credential_library_wigkgigz`.
+  - The created profile was visible in subsequent credential inventory reads.
+- Expected result:
+  - Credential creation should persist a new saved profile when the payload is valid.
+- Status: Pass
+- Notes:
+  - The profile was intentionally temporary and used only to validate create/update behavior.
+
+#### PASS - TC-048 Credential Profile Reference-Only Validation
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+- Steps performed:
+  1. Sent `POST /api/credentials` using `secretMode: reference-only` without a reference value.
+  2. Captured the API response.
+- Actual result:
+  - The API rejected the request with `REFERENCE_REQUIRED`.
+- Expected result:
+  - Reference-only credentials should fail validation when no reference is provided.
+- Status: Pass
+
+#### PASS - TC-049 Credential Profile Stored-Secret Validation
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+- Steps performed:
+  1. Sent `POST /api/credentials` using `secretMode: stored-secret` without a password.
+  2. Captured the API response.
+- Actual result:
+  - The API rejected the request with `PASSWORD_REQUIRED`.
+- Expected result:
+  - Stored-secret credentials should fail validation when no password is provided.
+- Status: Pass
+
+#### PASS - TC-050 Credential Profile Update Persists
+
+- Preconditions:
+  - Temporary credential id `credential_library_wigkgigz` created during `TC-047`.
+  - Production instance running at `http://127.0.0.1:3021`.
+- Steps performed:
+  1. Sent `PATCH /api/credentials/credential_library_wigkgigz` updating label, reference, and notes.
+  2. Verified the updated payload in the API response.
+  3. Re-read the credential inventory.
+- Actual result:
+  - The temporary credential updated successfully.
+  - The updated label/reference/notes persisted in the inventory.
+- Expected result:
+  - Credential updates should persist through the current API.
+- Status: Pass
+- Notes:
+  - No delete endpoint is currently available for credential cleanup, so this temporary QA record remains in the store as test evidence.
+
+#### PASS - TC-142 Stale Polling Noise Observation Recheck
+
+- Preconditions:
+  - Production instance running at `http://127.0.0.1:3021`.
+  - Fresh exploratory run `run_8jmtw81t` created for a polling recheck.
+- Steps performed:
+  1. Started `run_8jmtw81t` from the local app.
+  2. Navigated between `/monitor` and the completed `/review` state during and after execution.
+  3. Observed the live queue, the final Review payload, and the stored run record.
+- Actual result:
+  - The run progressed from active Monitor state into completed Review state without reproducing the earlier visible `/api/runs/[runId]/events` polling failure symptom.
+  - The run itself failed for the already-known target-auth reason, not for a Monitor polling breakdown.
+  - A transient aborted fetch for unrelated route data was still visible during the first Monitor load, so general route-transition abort chatter is not fully eliminated.
+- Expected result:
+  - Any remaining `events` polling failures or stale-run requests should be documented precisely rather than conflated with the external target-auth failure.
+- Status: Pass
+- Notes:
+  - The specific `/events` polling-noise symptom appears improved in this rerun.
+  - Residual low-severity abort noise on unrelated data fetches is still worth future cleanup, but it did not block the active-run Monitor workflow in this recheck.
+
+## Final Coverage Summary - 2026-03-26
+
+- Completed coverage:
+  - Fresh-store reset verification
+  - Route smoke coverage for `/draft`, `/monitor`, `/review`, `/library`, and `/settings`
+  - Saved environment and credential profile flows
+  - Draft validation matrix, including required-field and invalid-format gates
+  - Step parsing and scenario-generation coverage
+  - Run creation and execution checks across supported modes that were reachable with current prerequisites
+  - Review artifact and save-path coverage
+  - Scenario-library lifecycle coverage
+  - Settings persistence coverage
+  - Negative API validation coverage for environments, credentials, and run-creation boundaries
+- Historical blocker status at this checkpoint:
+  - At the time of this summary, exploratory login still appeared blocked.
+  - This was later superseded by the `Credential Correction Re-Test` and saved-credential fix verification sections.
+- Store state left intentionally after testing:
+  - Seed environment profile `Restaurant Partner Staging` remains present and restored to `Admin`.
+  - Seed credential profile `Restaurant Partner Admin` remains present.
+  - Temporary credential evidence record `credential_library_wigkgigz` remains present because current credential APIs do not expose deletion.
+  - Additional draft runs created for timebox boundary checks remain in the store as part of the test evidence set.
+- Overall conclusion:
+  - The QA Agent application has now been manually exercised across its planned internal workflows and validation surfaces.
+  - This checkpoint conclusion was later superseded by the saved-credential fix verification, which restored end-to-end exploratory execution on the current document credential.
+
+## Execution Log Continuation - 2026-03-26
+
+### Credential Correction Re-Test
+
+#### PASS - Direct Target Login Re-Check With Current Document Credential
+
+- Preconditions:
+  - Target login page reachable at `https://restaurant-partner-p-dev.onrender.com/login`.
+  - Current document credential password supplied as `ZXCVfdsaQWER1234@`.
+- Steps performed:
+  1. Opened the target login page directly in a clean browser session.
+  2. Submitted `ivanquiroscenteno@gmail.com` with password `ZXCVfdsaQWER1234@`.
+  3. Observed the post-login route.
+- Actual result:
+  - The target authenticated successfully and navigated to `https://restaurant-partner-p-dev.onrender.com/home/dashboard`.
+  - A welcome notification rendered for the operator account.
+- Expected result:
+  - The current document credential should authenticate successfully if the account remains valid.
+- Status: Pass
+- Notes:
+  - This supersedes the earlier conclusion that the available credentials were invalid at the target.
+
+#### PASS - Exploratory Run With Inline Credential Retry
+
+- Preconditions:
+  - Production instance running on `http://127.0.0.1:3021`.
+  - Current document credential password supplied inline as `ZXCVfdsaQWER1234@`.
+- Steps performed:
+  1. Created exploratory run `run_1s0vq5ab` using inline login email and password instead of the saved credential profile.
+  2. Started the run and waited for terminal completion.
+  3. Inspected the final run payload and artifacts.
+- Actual result:
+  - The run completed with status `pass`.
+  - Step 2 authenticated successfully to `https://restaurant-partner-p-dev.onrender.com/home/dashboard`.
+  - Step 3 completed discovery crawl successfully and produced crawl, report, screenshot, and QA-analysis artifacts.
+- Expected result:
+  - Exploratory execution should succeed when valid credentials are supplied inline.
+- Status: Pass
+- Notes:
+  - This isolated the remaining failure to the saved-credential path rather than to the target account or the login routine itself.
+
+### Stored Credential Root Cause And Fix Verification
+
+#### FAIL - Saved Credential Path Failed Despite Working Account Before Fix
+
+- Preconditions:
+  - Saved credential profile `credential_library_o9hkqp9a` updated to the working document password.
+  - Production instance running on `http://127.0.0.1:3021` before the decryption fix was rebuilt.
+- Steps performed:
+  1. Updated the saved credential profile to use password `ZXCVfdsaQWER1234@`.
+  2. Created exploratory run `run_m38w4kkv` using the saved credential profile.
+  3. Compared the outcome against the successful inline-credential run.
+- Actual result:
+  - The saved-credential run still failed at the login step and fell back to `/login`.
+  - The inline-credential run succeeded against the same target and account.
+- Expected result:
+  - Saved and inline credential paths should produce the same authentication outcome when they reference the same working account.
+- Status: Fail
+- Severity: High
+- Error / finding:
+  - Stored-secret credential decryption was parsing the encrypted value incorrectly.
+- Notes:
+  - Root cause was traced to `revealCredentialSecret()` splitting the full `enc:v1:...` string incorrectly instead of stripping the prefix before decoding the encrypted payload segments.
+
+#### PASS - Saved Credential Decryption Fix Verification
+
+- Preconditions:
+  - Stored-secret decryption parser fixed in `lib/qa/credential-secret.ts`.
+  - Fresh production build launched on `http://127.0.0.1:3022`.
+  - Saved credential profile `credential_library_o9hkqp9a` already updated to password `ZXCVfdsaQWER1234@`.
+- Steps performed:
+  1. Rebuilt the app and launched a fresh production server on `3022`.
+  2. Created exploratory run `run_yvokma77` using the saved environment and saved credential profile linkage.
+  3. Started the run and inspected the final run payload after completion.
+- Actual result:
+  - The run completed with status `pass`.
+  - Step 2 authenticated successfully to `https://restaurant-partner-p-dev.onrender.com/home/dashboard`.
+  - Step 3 completed discovery crawl successfully and produced crawl, report, screenshot, and QA-analysis artifacts.
+  - The saved-credential path now matches the successful inline-credential path.
+- Expected result:
+  - Exploratory execution should succeed through the saved credential profile once stored-secret decryption is correct.
+- Status: Pass
+- Notes:
+  - This resolves the previously reported `TC-093` blocker for the current document credential set.
+
+#### PASS - Draft And Monitor UI Saved-Credential Flow Verification
+
+- Preconditions:
+  - Fixed production instance running on `http://127.0.0.1:3022`.
+  - Saved environment profile `Restaurant Partner Staging` and saved credential profile `Restaurant Partner Admin` present in the Draft UI.
+- Steps performed:
+  1. Opened `/draft` on `3022`.
+  2. Selected `Restaurant Partner Staging` in `Saved Environment Profile`.
+  3. Confirmed `Restaurant Partner Admin` loaded in `Saved Credential Profile`.
+  4. Entered `UI Saved Credential Verification` as the feature area and created a run from the Draft UI.
+  5. Opened `/monitor`, confirmed the new draft run `run_z68kb6n3` appeared in the queue, and started it.
+  6. Polled the final run record after completion.
+- Actual result:
+  - Draft loaded the saved environment and saved credential correctly and re-enabled `Create Run` with blank inline credentials.
+  - The Draft-created run `run_z68kb6n3` completed with status `pass`.
+  - Step 2 authenticated successfully to `https://restaurant-partner-p-dev.onrender.com/home/dashboard` using the saved credential path.
+  - The run completed discovery crawl and produced the expected evidence artifacts.
+- Expected result:
+  - The saved-profile operator flow should work end to end through Draft creation and Monitor execution after the stored-secret fix.
+- Status: Pass
+- Notes:
+  - This verifies the operator-facing UI path, not only direct API-triggered runs.
+
+### Updated Final Conclusion
+
+- The earlier target-auth blocker has been superseded.
+- The current document credential `ZXCVfdsaQWER1234@` is valid for the target account.
+- The remaining failure was local to the QA Agent saved-secret path and is now fixed by correcting stored-secret decryption parsing.
+- Exploratory execution now passes with both inline credentials and the saved credential profile when run against the rebuilt app.
+
+## Final Findings Report - 2026-03-26
+
+### Test Session Metadata
+
+- Working app instance used for final verification: `http://127.0.0.1:3022`
+- Store backend: `SQLITE`
+- Target site: `https://restaurant-partner-p-dev.onrender.com`
+- Final verified credential path:
+  - Inline credential execution passed
+  - Saved credential execution passed after the stored-secret fix
+
+### Coverage Summary
+
+- Planned test-case ids: `67`
+- Unique planned test-case ids executed: `67`
+- Additional TC retest entries logged: `8`
+- Current run inventory on the final verified store snapshot:
+  - `10` draft
+  - `1` cancelled
+  - `11` fail
+  - `3` pass
+
+### Current Findings Ordered By Severity
+
+#### High
+
+- Resolved: saved stored-secret credentials could fail even when the target account was valid.
+  - Root cause: encrypted credential parsing in `revealCredentialSecret()` did not strip the `enc:v1:` prefix before decoding the payload segments.
+  - Verification: fixed in `lib/qa/credential-secret.ts` and revalidated through saved-profile exploratory runs `run_yvokma77` and `run_z68kb6n3`.
+
+#### Medium
+
+- Historical, resolved: environment-profile save accepted invalid target URLs before validation was tightened.
+  - This was re-tested and confirmed fixed in both Draft and the environments API.
+- Historical, resolved: Review save-path behavior auto-linked scenario libraries implicitly and hid useful operator feedback.
+  - This was re-tested and confirmed fixed.
+
+#### Low
+
+- Residual route-transition abort chatter still appears occasionally during route changes.
+  - The specific `/api/runs/[runId]/events` polling symptom improved in the latest recheck, but unrelated aborted requests can still appear during page transitions.
+- Current store cleanup remains manual or API-limited.
+  - Credential cleanup still lacks a delete path, so temporary QA evidence records remain unless the store is wiped again.
+
+### Validation Coverage Map
+
+- Required-field validation: covered across Draft, profiles, scenario-library actions, and direct API negative tests
+- Format validation: covered for target URL and run payload shape; current timebox behavior documented precisely
+- Success scenarios: covered for route load, profile persistence, scenario generation, run creation, Monitor execution, Review artifact rendering, Library rerun handoff, Settings inventory, and final exploratory discovery
+- Failure scenarios: covered for invalid URLs, incomplete inline credentials, invalid run payloads, invalid credential payloads, scenario-library mutation requirements, cancellation, and historical regressions that were subsequently fixed
+
+### Persistence Observations
+
+- Saved environment, saved credential, scenario-library, run, and artifact persistence were all exercised repeatedly against the SQLite backend.
+- The fixed build preserved stored-secret credentials correctly after the decryption parser correction.
+- The test campaign intentionally left evidence data in the store, including temporary draft and completed runs plus the temporary credential profile `credential_library_wigkgigz`.
+
+### Route-By-Route Summary
+
+- `/draft`: validated for required fields, scenario generation, saved-profile flows, library actions, and final saved-profile run creation on the fixed build
+- `/monitor`: validated for start, queue, active-state transitions, cancellation coverage, and final saved-profile execution handoff
+- `/review`: validated for completed-run evidence rendering, grouped artifacts, screenshot linkage, save/update library behavior, and final completed exploratory evidence
+- `/library`: validated for listing, filtering, metadata rendering, and rerun handoff back to Draft
+- `/settings`: validated for backend/provider visibility, counts, environment inventory, credential posture, and inline-secret risk reporting
+
+### Recommended Next Fixes
+
+1. Add credential and evidence cleanup endpoints or admin tooling so QA campaigns can remove temporary records without wiping the full store.
+2. Reduce residual route-transition abort chatter so Monitor and route navigation stay quieter in the browser console.
+3. Optionally condense the historical execution log into a shorter archival appendix now that the final state is verified and the superseded auth narrative has been corrected.

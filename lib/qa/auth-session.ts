@@ -5,6 +5,7 @@ import { getStoredCredentialLibrary, touchCredentialLibraryLastUsed } from "@/li
 import type { ParsedStep, RunPlan } from "@/lib/types";
 
 type LoginOutcome = { observedTarget: string; actionResult: string; notes: string };
+export type AuthStateOutcome = { observedTarget: string; notes: string; authenticatedViaLogin: boolean };
 
 interface AuthSessionDependencies {
   findFirstVisible: (locator: Locator) => Promise<Locator | null>;
@@ -60,29 +61,76 @@ export async function pageHasLoginForm(page: Page, deps: Pick<AuthSessionDepende
   const emailInput =
     (await deps.findFirstVisible(page.getByLabel(/correo|email|electr[oó]nico|username|usuario/i))) ??
     (await deps.findFirstVisible(page.getByPlaceholder(/correo|email/i))) ??
-    (await deps.findFirstVisible(page.locator('input[type="email"], input[name*="email"], input[autocomplete="email"]')));
+    (await deps.findFirstVisible(page.locator('input[type="email"], input[name*="email"], input[autocomplete="email"]'))) ??
+    (await deps.findFirstVisible(page.locator('input[type="text"], input:not([type]), textarea')));
 
   const passwordInput =
     (await deps.findFirstVisible(page.getByLabel(/contrase|password/i))) ??
     (await deps.findFirstVisible(page.locator('input[type="password"], input[name*="password"]')));
 
-  return Boolean(emailInput && passwordInput);
+  if (!emailInput || !passwordInput) {
+    return false;
+  }
+
+  const emailHint = [
+    await emailInput.getAttribute("name").catch(() => null),
+    await emailInput.getAttribute("autocomplete").catch(() => null),
+    await emailInput.getAttribute("placeholder").catch(() => null),
+    await emailInput.getAttribute("aria-label").catch(() => null),
+    await emailInput.evaluate((element) => (element as HTMLInputElement).type || "").catch(() => "")
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const passwordHint = [
+    await passwordInput.getAttribute("name").catch(() => null),
+    await passwordInput.getAttribute("autocomplete").catch(() => null),
+    await passwordInput.getAttribute("placeholder").catch(() => null),
+    await passwordInput.getAttribute("aria-label").catch(() => null),
+    await passwordInput.evaluate((element) => (element as HTMLInputElement).type || "").catch(() => "")
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const emailLooksAuthentic = /correo|email|electr[oó]nico|username|usuario|mail/.test(emailHint) || emailHint.includes("text");
+  const passwordLooksAuthentic = /contrase|password/.test(passwordHint);
+
+  return emailLooksAuthentic && passwordLooksAuthentic;
 }
 
 export async function ensureAuthenticatedState(
   page: Page,
   plan: RunPlan,
   deps: AuthSessionDependencies
-): Promise<string> {
-  await page.goto(plan.targetUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
+): Promise<AuthStateOutcome> {
+  const authProbeUrl = hasCredentialSource(plan) ? buildProtectedRouteUrl(plan) : plan.targetUrl;
+
+  await page.goto(authProbeUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
 
-  if (hasCredentialSource(plan) && (await pageHasLoginForm(page, deps))) {
+  const endedOnLoginRoute = /login|signin|sign-in|auth/i.test(page.url());
+  const sawLoginForm = await pageHasLoginForm(page, deps);
+
+  if (hasCredentialSource(plan) && (sawLoginForm || endedOnLoginRoute)) {
     const login = await deps.executeLogin(page, [], plan);
-    return login.notes;
+    return {
+      observedTarget: page.url(),
+      notes: login.notes,
+      authenticatedViaLogin: true
+    };
   }
 
-  return `Session is already authenticated at ${page.url()}.`;
+  if (endedOnLoginRoute) {
+    throw new Error("Target redirected to a login route, but the QA runtime could not resolve a usable login form for automated authentication.");
+  }
+
+  return {
+    observedTarget: page.url(),
+    notes: `Session is already authenticated at ${page.url()}.`,
+    authenticatedViaLogin: false
+  };
 }
 
 export function buildProtectedRouteUrl(plan: RunPlan): string {

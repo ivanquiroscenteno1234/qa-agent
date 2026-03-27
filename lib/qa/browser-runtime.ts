@@ -182,6 +182,11 @@ export async function executeLogin(
   await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
 
   if (page.url().includes("/login")) {
+    const bodyText = ((await page.locator("body").innerText().catch(() => "")) || "").replace(/\s+/g, " ").trim();
+    if (/correo|email|contrase|password/.test(bodyText) && /incorrect|inv[aá]lid|int[eé]ntalo de nuevo/i.test(bodyText)) {
+      throw new Error("The target application rejected the automated login attempt with an invalid-credentials message.");
+    }
+
     throw new Error("Login did not reach an authenticated application route.");
   }
 

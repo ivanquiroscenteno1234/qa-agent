@@ -2,6 +2,7 @@ import type { BrowserContext, Locator, Page } from "playwright";
 
 import { buildRunArtifacts, captureScreenshot } from "@/lib/qa/artifact-builder";
 import {
+  type AuthStateOutcome,
   buildProtectedRouteUrl as buildProtectedRouteUrlRuntime,
   ensureAuthenticatedState as ensureAuthenticatedStateRuntime,
   pageHasLoginForm as pageHasLoginFormRuntime,
@@ -114,7 +115,7 @@ function sanitizeError(error: unknown): string {
   return "Unknown execution error";
 }
 
-async function ensureAuthenticatedState(page: Page, plan: RunPlan): Promise<string> {
+async function ensureAuthenticatedState(page: Page, plan: RunPlan): Promise<AuthStateOutcome> {
   return ensureAuthenticatedStateRuntime(page, plan, { findFirstVisible, executeLogin });
 }
 
@@ -148,6 +149,7 @@ async function executeDiscoveryRun(record: RunRecord, context: BrowserContext, p
     selectDiscoveryLabels,
     firstVisibleByPatterns,
     pageHasLoginForm,
+    ensureAuthenticatedState,
     executeNavigate,
     executeLogin,
     createSyntheticStepResult,

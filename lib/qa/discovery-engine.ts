@@ -1,7 +1,7 @@
 import type { BrowserContext, Locator, Page } from "playwright";
 
 import { buildAnalysisReport, buildManualTestPlan, buildRunArtifacts, captureScreenshot } from "@/lib/qa/artifact-builder";
-import { hasCredentialSource } from "@/lib/qa/auth-session";
+import { hasCredentialSource, type AuthStateOutcome } from "@/lib/qa/auth-session";
 import type { CrawlSnapshot, CrawlView } from "@/lib/qa/crawl-model";
 import { discoverNavigationCandidates } from "@/lib/qa/navigation-discovery";
 import { generateScenarios } from "@/lib/qa/scenario-generator";
@@ -25,6 +25,7 @@ interface DiscoveryEngineDependencies {
   selectDiscoveryLabels: (values: string[], limit: number) => string[];
   firstVisibleByPatterns: (page: Page, patterns: string[]) => Promise<Locator | null>;
   pageHasLoginForm: (page: Page) => Promise<boolean>;
+  ensureAuthenticatedState: (page: Page, plan: RunPlan) => Promise<AuthStateOutcome>;
   executeNavigate: (page: Page, step: ParsedStep, plan: RunPlan) => Promise<ExecutionOutcome>;
   executeLogin: (page: Page, parsedSteps: ParsedStep[], plan: RunPlan) => Promise<ExecutionOutcome>;
   createSyntheticStepResult: (
@@ -90,6 +91,11 @@ async function capturePageSnapshot(page: Page, label: string): Promise<CrawlView
   }, label);
 }
 
+async function dismissTransientOverlays(page: Page): Promise<void> {
+  await page.keyboard.press("Escape").catch(() => undefined);
+  await page.waitForTimeout(100).catch(() => undefined);
+}
+
 async function collectDeepDiscoveryCrawl(page: Page, plan: RunPlan, deps: Pick<DiscoveryEngineDependencies, "normalizeText" | "selectDiscoveryLabels" | "firstVisibleByPatterns" | "cleanLabel">): Promise<string> {
   const navigationCandidates = await discoverNavigationCandidates(page, deps);
   const visitedViews: CrawlView[] = [];
@@ -121,6 +127,7 @@ async function collectDeepDiscoveryCrawl(page: Page, plan: RunPlan, deps: Pick<D
       continue;
     }
 
+    await dismissTransientOverlays(page);
     await target.click().catch(() => undefined);
     await Promise.race([
       page.waitForLoadState("networkidle", { timeout: 5_000 }),
@@ -424,38 +431,60 @@ export async function executeDiscoveryRun(
     });
 
     await deps.ensureRunNotCancelled(record.id);
-    if (hasCredentialSource(record.plan) && (await deps.pageHasLoginForm(page))) {
-      const login = await deps.executeLogin(page, [], record.plan);
-      const loginScreenshotArtifact = await captureScreenshot(page, record.id, 2, "Discovery Step 2");
-      screenshotArtifacts.push(loginScreenshotArtifact);
-      stepResults.push(
-        deps.createSyntheticStepResult(
-          2,
-          "Authenticate with the supplied discovery credentials.",
-          "login",
-          login.observedTarget,
-          login.actionResult,
-          "pass",
-          login.notes,
-          "Discovery Step 2",
-          loginScreenshotArtifact.id
-        )
-      );
+    if (hasCredentialSource(record.plan)) {
+      try {
+        const authState = await deps.ensureAuthenticatedState(page, record.plan);
+        if (authState.authenticatedViaLogin) {
+          const loginStepNumber = stepResults.length + 1;
+          const loginScreenshotArtifact = await captureScreenshot(page, record.id, loginStepNumber, `Discovery Step ${loginStepNumber}`);
+          screenshotArtifacts.push(loginScreenshotArtifact);
+          stepResults.push(
+            deps.createSyntheticStepResult(
+              loginStepNumber,
+              "Authenticate with the supplied discovery credentials.",
+              "login",
+              authState.observedTarget,
+              "Authenticated with the supplied discovery credentials.",
+              "pass",
+              authState.notes,
+              `Discovery Step ${loginStepNumber}`,
+              loginScreenshotArtifact.id
+            )
+          );
 
-      await deps.persistCheckpoint(record, {
-        currentPhase: "executing",
-        status: "running",
-        currentActivity: "Authenticating with discovery credentials.",
-        currentStepNumber: 2,
-        currentScenarioIndex: undefined,
-        currentScenarioTitle: undefined,
-        summary: "Discovery authentication completed. Preparing deep crawl.",
-        stepResults: [...stepResults],
-        artifacts: [...screenshotArtifacts]
-      });
+          await deps.persistCheckpoint(record, {
+            currentPhase: "executing",
+            status: "running",
+            currentActivity: "Authenticating with discovery credentials.",
+            currentStepNumber: loginStepNumber,
+            currentScenarioIndex: undefined,
+            currentScenarioTitle: undefined,
+            summary: "Discovery authentication completed. Preparing deep crawl.",
+            stepResults: [...stepResults],
+            artifacts: [...screenshotArtifacts]
+          });
+        }
+      } catch (error) {
+        const loginStepNumber = stepResults.length + 1;
+        const loginScreenshotArtifact = await captureScreenshot(page, record.id, loginStepNumber, `Discovery Step ${loginStepNumber}`);
+        screenshotArtifacts.push(loginScreenshotArtifact);
+        stepResults.push(
+          deps.createSyntheticStepResult(
+            loginStepNumber,
+            "Authenticate with the supplied discovery credentials.",
+            "login",
+            page.url(),
+            error instanceof Error ? error.message : "Automated authentication failed.",
+            "fail",
+            "The exploratory run could not establish an authenticated session before crawling.",
+            `Discovery Step ${loginStepNumber}`,
+            loginScreenshotArtifact.id
+          )
+        );
+        throw error;
+      }
     }
 
-    await deps.ensureRunNotCancelled(record.id);
     crawlContent = await collectDeepDiscoveryCrawl(page, record.plan, deps);
     const crawlSnapshot = parseCrawlSnapshot(crawlContent);
     const discoverySurface = summarizeDiscovery(crawlSnapshot, deps);
