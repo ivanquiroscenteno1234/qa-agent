@@ -53,9 +53,6 @@ import { needsCredentialSecretProtection, protectCredentialSecret } from "@/lib/
 import type { QaStoreBackend, RunRecordPatch } from "@/lib/qa/storage/types";
 import { createId } from "@/lib/qa/utils";
 
-let cachedRuns: RunRecord[] | null = null;
-let runMutationLock = Promise.resolve();
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -180,6 +177,9 @@ export function readSeedDataFromJsonStoreSync(): {
 }
 
 function createJsonStoreBackend(): QaStoreBackend {
+  let cachedRuns: RunRecord[] | null = null;
+  let runMutationLock = Promise.resolve();
+
   async function readRuns(): Promise<RunRecord[]> {
     if (cachedRuns) {
       return [...cachedRuns];
