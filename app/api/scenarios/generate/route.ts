@@ -16,5 +16,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
-  return NextResponse.json(generateScenarios(parsed.data));
+  return NextResponse.json(await generateScenarios(parsed.data));
 }

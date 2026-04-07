@@ -1,6 +1,10 @@
 import type { GenerateScenariosResponse, RunPlan, Scenario, ScenarioType } from "@/lib/types";
+import { SchemaType } from "@google/generative-ai";
+
 import { parsePlainTextSteps } from "@/lib/qa/step-parser";
 import { createId, titleCase } from "@/lib/qa/utils";
+import { generateStructuredContent } from "@/lib/qa/llm/client";
+import { getQaLlmConfig } from "@/lib/qa/llm/config";
 
 interface CrawlSnapshot {
   title?: string;
@@ -119,9 +123,64 @@ function getDiscoverySurface(snapshot: CrawlSnapshot | null): string[] {
   );
 }
 
-export function generateScenarios(plan: RunPlan, options?: { crawlContent?: string }): GenerateScenariosResponse {
-  const parsed = parsePlainTextSteps(plan.stepsText);
+export async function generateScenarios(plan: RunPlan, options?: { crawlContent?: string }): Promise<GenerateScenariosResponse> {
+  const config = getQaLlmConfig();
+  const parsed = await parsePlainTextSteps(plan.stepsText);
   const crawlSnapshot = parseCrawlSnapshot(options?.crawlContent);
+
+  if (config.enabled && config.features.scenarioGeneration) {
+    const prompt = `Generate QA scenarios for the feature: "${plan.featureArea}" based on the objective: "${plan.objective}".
+    The target url is: ${plan.targetUrl}
+    The role is: ${plan.role}
+    The mode is: ${plan.mode}
+    ${options?.crawlContent ? `\nHere is a crawl snapshot of the application state: ${options.crawlContent}` : ""}
+    ${parsed.parsedSteps.length ? `\nUser provided test steps: ${plan.stepsText}` : ""}`;
+
+    const response = await generateStructuredContent<GenerateScenariosResponse>(
+      prompt,
+      {
+        type: SchemaType.OBJECT,
+        properties: {
+          scenarios: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                title: { type: SchemaType.STRING },
+                priority: { type: SchemaType.STRING, description: "P0, P1, or P2" },
+                type: { type: SchemaType.STRING, description: "happy-path, negative, boundary, permissions, state-transition, regression, or exploratory" },
+                prerequisites: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+                steps: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+                expectedResult: { type: SchemaType.STRING },
+                riskRationale: { type: SchemaType.STRING },
+                approvedForAutomation: { type: SchemaType.BOOLEAN }
+              },
+              required: ["title", "priority", "type", "prerequisites", "steps", "expectedResult", "riskRationale", "approvedForAutomation"]
+            }
+          },
+          coverageGaps: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING }
+          },
+          riskSummary: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING }
+          }
+        },
+        required: ["scenarios", "coverageGaps", "riskSummary"]
+      },
+      "You are a QA automation architect. Generate robust test scenarios covering happy paths, negative flows, permissions, and edge cases. Ensure steps are clear and actionable."
+    );
+
+    if (response) {
+      return {
+        scenarios: response.scenarios.map(s => ({ ...s, id: createId("scenario") })) as Scenario[],
+        coverageGaps: response.coverageGaps || [],
+        riskSummary: response.riskSummary || []
+      };
+    }
+  }
+
   const feature = plan.featureArea.trim() || "Feature under test";
   const role = plan.role.trim() || "configured role";
   const objective = plan.objective.trim() || `Validate ${feature}`;

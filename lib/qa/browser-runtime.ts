@@ -1,7 +1,10 @@
 import { chromium, firefox, webkit, type Locator, type Page } from "playwright";
+import { SchemaType } from "@google/generative-ai";
 
 import { hasCredentialSource } from "@/lib/qa/auth-session";
 import type { ParsedStep, RunPlan } from "@/lib/types";
+import { generateStructuredContent } from "@/lib/qa/llm/client";
+import { getQaLlmConfig } from "@/lib/qa/llm/config";
 
 type ExecutionOutcome = { observedTarget: string; actionResult: string; notes: string };
 
@@ -37,6 +40,61 @@ export async function findFirstVisible(locator: Locator): Promise<Locator | null
       return candidate;
     }
   }
+  return null;
+}
+
+export async function findWithLlmFallback(page: Page, targetDescription: string, deps: TextMatchingDependencies): Promise<Locator | null> {
+  const config = getQaLlmConfig();
+
+  if (!config.enabled) {
+    return null;
+  }
+
+  try {
+    // Collect all semantic candidates to pass to LLM
+    const elementsData: Array<{ id: number, tag: string, text: string, type?: string, name?: string, placeholder?: string }> = [];
+    const semanticCandidates = page.locator('button, a, input, textarea, select, [role="tab"], [role="button"], h1, h2, h3, h4, [data-testid]');
+    const count = await semanticCandidates.count();
+
+    for (let index = 0; index < count; index += 1) {
+      if (elementsData.length >= 100) break; // Limit payload
+
+      const candidate = semanticCandidates.nth(index);
+      if (!(await candidate.isVisible().catch(() => false))) {
+        continue;
+      }
+
+      const text = deps.normalizeText((await candidate.textContent()) ?? "");
+      const tag = await candidate.evaluate(el => el.tagName.toLowerCase()).catch(() => "unknown");
+      const type = await candidate.getAttribute("type").catch(() => null) ?? undefined;
+      const name = await candidate.getAttribute("name").catch(() => null) ?? undefined;
+      const placeholder = await candidate.getAttribute("placeholder").catch(() => null) ?? undefined;
+
+      if (text || type || name || placeholder) {
+        elementsData.push({ id: index, tag, text, type, name, placeholder });
+      }
+    }
+
+    if (elementsData.length === 0) return null;
+
+    const response = await generateStructuredContent<{ selectedId: number | null }>(
+      `Find the element that best matches the target description: "${targetDescription}".\n\nAvailable elements on page:\n${JSON.stringify(elementsData, null, 2)}`,
+      {
+        type: SchemaType.OBJECT,
+        properties: {
+          selectedId: { type: SchemaType.NUMBER, nullable: true, description: "The id of the best matching element, or null if no match found." }
+        }
+      },
+      "You are an intelligent QA assistant. Analyze the list of elements and find the one that best matches the target description. Return its id. If no element matches reasonably, return null."
+    );
+
+    if (response && response.selectedId !== null && response.selectedId !== undefined) {
+      return semanticCandidates.nth(response.selectedId);
+    }
+  } catch (err) {
+    console.error("LLM Fallback Locator Error:", err);
+  }
+
   return null;
 }
 
@@ -80,7 +138,8 @@ export async function firstVisibleByPatterns(page: Page, patterns: string[], dep
     }
   }
 
-  return null;
+  // Use LLM as a fallback if deterministic patterns fail
+  return findWithLlmFallback(page, patterns.join(", "), deps);
 }
 
 export async function pageHasLoginForm(page: Page, deps: Pick<BrowserRuntimeDependencies, "findFirstVisible">): Promise<boolean> {

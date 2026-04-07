@@ -1153,14 +1153,14 @@ function createSqliteStoreBackend(): QaStoreBackend {
       });
     },
     async createRun(plan: RunPlan): Promise<RunRecord> {
-      const parsed = parsePlainTextSteps(plan.stepsText);
+      const parsed = await parsePlainTextSteps(plan.stepsText);
       const scenarioLibraries = listScenarioLibrariesInternal();
       const selectedLibrary = plan.scenarioLibraryId
         ? scenarioLibraries.find((library) => library.id === plan.scenarioLibraryId)
         : undefined;
       const generated = selectedLibrary
         ? { scenarios: selectedLibrary.scenarios, coverageGaps: selectedLibrary.coverageGaps, riskSummary: selectedLibrary.riskSummary }
-        : generateScenarios(plan);
+        : await generateScenarios(plan);
       const now = new Date().toISOString();
       return writeRun(sanitizeRunRecordContent({
         id: createId("run"),
