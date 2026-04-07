@@ -43,11 +43,12 @@ export interface ApiErrorShape {
 }
 
 export function isLocalTarget(targetUrl: string): boolean {
+  const localPattern = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/i;
   try {
     const parsed = new URL(targetUrl);
-    return /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(parsed.hostname);
+    return localPattern.test(parsed.hostname);
   } catch {
-    return /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(targetUrl);
+    return localPattern.test(targetUrl);
   }
 }
 

@@ -43,6 +43,8 @@ describe("isLocalTarget", () => {
     expect(isLocalTarget("https://example.com")).toBe(false);
     expect(isLocalTarget("http://123.123.123.123")).toBe(false);
     expect(isLocalTarget("https://google.com/search?q=localhost")).toBe(false);
+    expect(isLocalTarget("https://my-localhost.com")).toBe(false);
+    expect(isLocalTarget("https://127.0.0.1.example.com")).toBe(false);
   });
 
   it("handles case-insensitive hostnames", () => {
