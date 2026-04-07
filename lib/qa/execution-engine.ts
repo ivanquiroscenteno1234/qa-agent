@@ -97,12 +97,21 @@ async function runStep(page: Page, parsedSteps: ParsedStep[], plan: RunPlan, ste
 }
 
 function sanitizeError(error: unknown): string {
-  const redact = (value: string) => value
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED_EMAIL]")
-    .replace(/password\s*[:=]?\s*[^\s]+/gi, "password [REDACTED]")
-    .replace(/token\s*[:=]?\s*[^\s]+/gi, "token [REDACTED]")
-    .replace(/apikey\s*[:=]?\s*[^\s]+/gi, "apikey [REDACTED]")
-    .replace(/zxcvFDSAqwer1234@/g, "[REDACTED_SECRET]");
+  const redact = (value: string) => {
+    let redacted = value
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED_EMAIL]")
+      .replace(/password\s*[:=]?\s*[^\s]+/gi, "password [REDACTED]")
+      .replace(/token\s*[:=]?\s*[^\s]+/gi, "token [REDACTED]")
+      .replace(/apikey\s*[:=]?\s*[^\s]+/gi, "apikey [REDACTED]")
+      .replace(/zxcvFDSAqwer1234@/g, "[REDACTED_SECRET]");
+
+    const geminiKey = process.env.GEMINI_API_KEY?.trim();
+    if (geminiKey) {
+      redacted = redacted.replaceAll(geminiKey, "[REDACTED]");
+    }
+
+    return redacted;
+  };
 
   if (error instanceof Error) {
     return redact(error.message);
