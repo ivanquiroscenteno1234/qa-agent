@@ -1,5 +1,9 @@
+import { useState } from "react";
+
 import { buildRunListItems } from "@/lib/qa/run-view-model";
 import type { RunStatus, RunSummary } from "@/lib/types";
+
+const PAGE_SIZE = 50;
 
 interface RunListPanelProps {
   runs: RunSummary[];
@@ -10,7 +14,11 @@ interface RunListPanelProps {
 }
 
 export function RunListPanel({ runs, selectedRunId, emptyListMessage, onSelectRun, isActiveRun }: RunListPanelProps) {
-  const items = buildRunListItems(runs);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  const visibleRuns = runs.slice(0, visibleCount);
+  const hasMore = runs.length > visibleCount;
+  const items = buildRunListItems(visibleRuns);
 
   return (
     <aside className="monitor-run-list-panel">
@@ -67,6 +75,15 @@ export function RunListPanel({ runs, selectedRunId, emptyListMessage, onSelectRu
           );
         })}
         {!runs.length && <p className="muted">{emptyListMessage}</p>}
+        {hasMore && (
+          <button
+            type="button"
+            className="monitor-run-list-load-more"
+            onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
+          >
+            Load more ({runs.length - visibleCount} remaining)
+          </button>
+        )}
       </div>
     </aside>
   );

@@ -26,11 +26,26 @@ const scenarioLibraryMutationSchema = z.object({
   }),
   sourceRunId: z.string().optional(),
   scenarioLibraryId: z.string().optional(),
-  name: z.string().optional()
+  name: z.string().optional(),
+  author: z.string().optional(),
+  sourceRunInsights: z.array(
+    z.object({
+      id: z.string(),
+      category: z.string(),
+      evidenceKind: z.enum(["observed", "interpreted"]),
+      title: z.string(),
+      summary: z.string(),
+      recommendation: z.string(),
+      confidence: z.number(),
+      evidence: z.array(z.object({ type: z.string(), label: z.string() }))
+    })
+  ).optional()
 });
 
-export async function GET() {
-  return NextResponse.json({ scenarioLibraries: await listScenarioLibraries() });
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const includeArchived = url.searchParams.get("includeArchived") === "true";
+  return NextResponse.json({ scenarioLibraries: await listScenarioLibraries(includeArchived ? { includeArchived: true } : undefined) });
 }
 
 export async function POST(request: Request) {
@@ -41,7 +56,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
   }
 
-  const { action, plan, generated, sourceRunId, scenarioLibraryId, name } = parsed.data;
+  const { action, plan, generated, sourceRunId, scenarioLibraryId, name, author, sourceRunInsights } = parsed.data;
 
   if (!generated.scenarios.length) {
     return NextResponse.json(
@@ -74,7 +89,9 @@ export async function POST(request: Request) {
     generated,
     sourceRunId,
     action === "update" ? scenarioLibraryId : undefined,
-    name
+    name,
+    author,
+    sourceRunInsights as import("@/lib/types").AnalysisInsight[] | undefined
   );
 
   return NextResponse.json({ scenarioLibrary });

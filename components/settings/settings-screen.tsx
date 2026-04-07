@@ -27,6 +27,14 @@ export async function SettingsScreen({ storeBackendLabel = "json" }: SettingsScr
   const inlineCredentialRunCount = runs.filter((run) => Boolean(run.plan.loginEmail || run.plan.loginPassword)).length;
   const llmConfig = getQaLlmConfig();
 
+  const completedRuns = runs.filter((r) => r.status === "pass" || r.status === "fail" || r.status === "blocked" || r.status === "inconclusive" || r.status === "cancelled");
+  const llmUsage = {
+    total: completedRuns.length,
+    stepParsing: completedRuns.filter((r) => r.llmMetadata?.stepParsing === "llm").length,
+    scenarioGeneration: completedRuns.filter((r) => r.llmMetadata?.scenarioGeneration === "llm").length,
+    reviewAnalysis: completedRuns.filter((r) => r.llmMetadata?.reviewAnalysis === "llm").length
+  };
+
   return (
     <AppShell
       navItems={[
@@ -96,6 +104,19 @@ export async function SettingsScreen({ storeBackendLabel = "json" }: SettingsScr
           <li>Review analysis: {llmConfig.features.reviewAnalysis ? "Enabled" : "Disabled"}</li>
           {llmConfig.warning ? <li>{llmConfig.warning}</li> : null}
         </ul>
+      </SectionFrame>
+
+      <SectionFrame eyebrow="Model Usage History" title="LLM Assistance Statistics" reference={`${llmUsage.total} completed runs`}>
+        {llmUsage.total === 0 ? (
+          <p className="muted">No completed runs yet. Usage statistics will appear here after runs finish.</p>
+        ) : (
+          <ul>
+            <li>Completed runs: {llmUsage.total}</li>
+            <li>Step parsing via Gemini: {llmUsage.stepParsing} of {llmUsage.total}</li>
+            <li>Scenario generation via Gemini: {llmUsage.scenarioGeneration} of {llmUsage.total}</li>
+            <li>Review analysis via Gemini: {llmUsage.reviewAnalysis} of {llmUsage.total}</li>
+          </ul>
+        )}
       </SectionFrame>
 
       <SectionFrame eyebrow="Credential Handling" title="Credential Posture" reference={`${credentialCards.length} tracked profiles`}>

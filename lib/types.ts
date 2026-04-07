@@ -25,6 +25,11 @@ export type FailureCategory =
   | "timeout"
   | "auth-failed"
   | "navigation-mismatch"
+  | "navigation-failed"
+  | "navigation-timeout"
+  | "accessibility-violation"
+  | "state-mismatch"
+  | "runtime-error"
   | "assertion-failed"
   | "unsupported-scenario"
   | "unexpected-dialog"
@@ -58,6 +63,8 @@ export interface ParsedStep {
   expectedResult?: string;
   fallbackInterpretation: string;
   riskClassification: RiskLevel;
+  /** Whether Gemini LLM or the heuristic parser produced the final action classification */
+  parsingSource?: "llm" | "heuristic";
 }
 
 export interface Scenario {
@@ -70,6 +77,9 @@ export interface Scenario {
   expectedResult: string;
   riskRationale: string;
   approvedForAutomation: boolean;
+  surfaceTargetSelector?: string;
+  /** Whether Gemini LLM or the deterministic generator produced this scenario */
+  generationSource?: "llm" | "deterministic";
 }
 
 export interface StepResult {
@@ -83,6 +93,7 @@ export interface StepResult {
   notes: string;
   screenshotLabel: string;
   screenshotArtifactId?: string;
+  policyHandler?: string;
 }
 
 export interface Artifact {
@@ -131,12 +142,30 @@ export interface DefectCandidate {
 
 export interface AnalysisInsight {
   id: string;
-  category: "intended-flow" | "usability" | "accessibility" | "information-architecture" | "qa-recommendation";
+  /** Legacy values (usability, accessibility, information-architecture, qa-recommendation) are kept for backward
+   *  compatibility. New insight generators should use the refined set instead:
+   *  usability-risk, missing-label, inconsistent-language, defect-candidate, manual-follow-up */
+  category:
+    | "intended-flow"
+    | "usability-risk"
+    | "missing-label"
+    | "inconsistent-language"
+    | "defect-candidate"
+    | "manual-follow-up"
+    // legacy – preserved for backward compatibility
+    | "usability"
+    | "accessibility"
+    | "information-architecture"
+    | "qa-recommendation";
+  /** Distinguishes raw evidence captured during execution from analysis conclusions drawn by the engine */
+  evidenceKind: "observed" | "interpreted";
   title: string;
   summary: string;
   recommendation: string;
   confidence: number;
   evidence: AnalysisEvidenceReference[];
+  /** Whether Gemini LLM or the heuristic analysis engine produced this insight */
+  analysisSource?: "llm" | "heuristic";
 }
 
 export interface AnalysisEvidenceReference {
@@ -161,6 +190,8 @@ export interface ScenarioLibraryVersion {
   scenarioCount: number;
   summary: string;
   changeSummary: ScenarioLibraryChangeSummary;
+  /** Insights from the run that created or updated this library version — used as baseline for regression comparison */
+  baselineInsights?: AnalysisInsight[];
 }
 
 export interface ScenarioLibraryComparison {
@@ -296,7 +327,19 @@ export interface RunRecord {
   artifacts: Artifact[];
   defects: DefectCandidate[];
   analysisInsights: AnalysisInsight[];
+  insightComparison?: { persisting: string[]; resolved: string[]; new: string[] };
+  llmMetadata?: {
+    stepParsing: "llm" | "heuristic";
+    scenarioGeneration: "llm" | "deterministic";
+    reviewAnalysis: "llm" | "heuristic";
+    promptVersions?: {
+      stepNormalization: string;
+      scenarioGeneration: string;
+      reviewAnalysis: string;
+    };
+  };
   scenarioLibraryComparison?: ScenarioLibraryComparison;
+  pageSurfaceSnapshot?: import("@/lib/qa/crawl-model").PageSurface;
   events: RunEvent[];
   warnings: ExecutionWarning[];
 }
@@ -304,6 +347,8 @@ export interface RunRecord {
 export interface ScenarioLibrary {
   id: string;
   name: string;
+  author?: string;
+  status: "active" | "archived";
   sourceRunId?: string;
   featureArea: string;
   environment: string;

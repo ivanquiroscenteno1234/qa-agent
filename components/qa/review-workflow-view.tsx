@@ -6,7 +6,7 @@ import { EvidenceTimeline } from "@/components/qa/evidence-timeline";
 import { RunListPanel } from "@/components/qa/run-list-panel";
 import { SectionFrame } from "@/components/ui/section-frame";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { buildReviewComparison } from "@/lib/qa/run-view-model";
+import { buildReviewComparison, buildRunProvenanceSummary } from "@/lib/qa/run-view-model";
 
 interface ReviewWorkflowViewProps {
   isLoading: boolean;
@@ -44,6 +44,7 @@ export function ReviewWorkflowView({
   const comparison = buildReviewComparison(selectedRun, runs);
   const baselineRun = comparison.previousComparableRun;
   const selectedRunDuration = selectedRun ? buildDuration(selectedRun.startedAt, selectedRun.completedAt) : "Not started";
+  const provenance = selectedRun ? buildRunProvenanceSummary(selectedRun) : null;
 
   return (
     <section className="review-screen">
@@ -105,6 +106,15 @@ export function ReviewWorkflowView({
                   </span>
                 </div>
 
+                {provenance && provenance.stepParsing !== "unknown" ? (
+                  <div className={`review-provenance-banner${provenance.hasLlmAssistance ? "" : " review-provenance-heuristic"}`}>
+                    <strong>Run provenance</strong>
+                    <span>Step parsing: <em>{provenance.stepParsing}</em></span>
+                    <span>Scenario generation: <em>{provenance.scenarioGeneration}</em></span>
+                    <span>Review analysis: <em>{provenance.reviewAnalysis}</em></span>
+                  </div>
+                ) : null}
+
                 <p className="feedback-banner">{feedback}</p>
 
                 <p className="muted">{selectedRun.summary}</p>
@@ -146,6 +156,41 @@ export function ReviewWorkflowView({
                         {!selectedRun.analysisInsights.length && <li>No QA analysis insights were generated for this run.</li>}
                       </ul>
                     </SectionFrame>
+
+                    {selectedRun.plan.mode === "regression-run" && (
+                      <SectionFrame eyebrow="Insight Comparison" title="Baseline Insight Delta">
+                        {selectedRun.insightComparison ? (
+                          <>
+                            <p className="muted">
+                              Comparing {selectedRun.analysisInsights.length} current insight(s) against the linked library baseline.
+                            </p>
+                            <ul>
+                              <li>Persisting: {selectedRun.insightComparison.persisting.length} insight(s) unchanged</li>
+                              <li>Resolved: {selectedRun.insightComparison.resolved.length} insight(s) no longer present</li>
+                              <li>New: {selectedRun.insightComparison.new.length} insight(s) appeared since last baseline</li>
+                            </ul>
+                            {selectedRun.insightComparison.new.length > 0 && (
+                              <div className="comparison-tags">
+                                {selectedRun.insightComparison.new.map((title) => (
+                                  <span key={`new-insight-${title}`}>New: {title}</span>
+                                ))}
+                              </div>
+                            )}
+                            {selectedRun.insightComparison.resolved.length > 0 && (
+                              <div className="comparison-tags">
+                                {selectedRun.insightComparison.resolved.map((title) => (
+                                  <span key={`resolved-insight-${title}`}>Resolved: {title}</span>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <ul>
+                            <li>No baseline insight comparison available. Save this run as a library version to enable future comparisons.</li>
+                          </ul>
+                        )}
+                      </SectionFrame>
+                    )}
                   </div>
 
                   <div className="review-secondary-stack">

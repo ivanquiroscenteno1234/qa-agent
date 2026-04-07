@@ -1,0 +1,20 @@
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas de negocio\DopaDrive\DopaDrive\DopaDrive
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas de negocio\FastEatAI\fast_eat_ai
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas de negocio\FastEatAI\fastAPI\fastAPI
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas de negocio\PuraVidaExplorer\pura-vida-explorer
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas de negocio\VibeFlowCoding\delivery-interceptor
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas de negocio\VibeFlowCoding\FastEatAI
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas de negocio\VibeFlowCoding\fast-eat-api-nestjs
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas de negocio\VibeFlowCoding\fast-eat-client
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas de negocio\VibeFlowCoding\restaurant-partner-p
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas de negocio\VibeFlowCoding\vibe-flow-coding
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas de negocio\VibeFlowCoding\virtualMenu
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas\AIAgents
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas\builder-debt-&-risk-forensic-tool
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas\gemini-notebook
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas\Jules
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas\RAGAppPCOApi
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas\Script Builder
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas\Script Builder V2
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas\Script Builder V2\deep-scraper-agent
+E:\Ivan (IMPORTANTE)\Ivan\Disco D\Ideas\Script Builder V3\deep-scraper-agent

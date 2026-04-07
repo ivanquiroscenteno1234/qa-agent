@@ -20,5 +20,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
-  return NextResponse.json({ run: await createRun(parsed.data) }, { status: 201 });
+  const plan = parsed.data;
+  // Security: strip inline credentials from the persisted plan when a saved
+  // credential profile is selected — the library record holds the secret.
+  const sanitizedPlan = plan.credentialLibraryId
+    ? { ...plan, loginEmail: "", loginPassword: "" }
+    : plan;
+
+  return NextResponse.json({ run: await createRun(sanitizedPlan) }, { status: 201 });
 }

@@ -3,6 +3,7 @@ import type { ScenarioLibrary } from "@/lib/types";
 export interface ScenarioLibraryFilters {
   featureArea: string;
   riskProfile: string;
+  author: string;
 }
 
 function deriveRiskProfile(library: ScenarioLibrary): "high" | "medium" | "low" {
@@ -23,10 +24,15 @@ export function buildScenarioLibraryCards(libraries: ScenarioLibrary[], filters:
   return libraries.filter((library) => {
     const featureMatch = filters.featureArea === "all" || library.featureArea === filters.featureArea;
     const riskMatch = filters.riskProfile === "all" || deriveRiskProfile(library) === filters.riskProfile;
-    return featureMatch && riskMatch;
+    const authorMatch = filters.author === "all" || !filters.author || (library.author ?? "") === filters.author;
+    return featureMatch && riskMatch && authorMatch;
   });
 }
 
 export function collectScenarioLibraryFeatureAreas(libraries: ScenarioLibrary[]): string[] {
   return [...new Set(libraries.map((library) => library.featureArea).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+}
+
+export function collectScenarioLibraryAuthors(libraries: ScenarioLibrary[]): string[] {
+  return [...new Set(libraries.map((library) => library.author ?? "").filter(Boolean))].sort((left, right) => left.localeCompare(right));
 }

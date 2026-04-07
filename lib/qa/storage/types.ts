@@ -1,4 +1,5 @@
 import type {
+  AnalysisInsight,
   Artifact,
   CredentialLibraryInput,
   CredentialLibraryRecord,
@@ -8,6 +9,7 @@ import type {
   GenerateScenariosResponse,
   RunEvent,
   RunRecord,
+  RunStatus,
   RunSummary,
   ScenarioLibrary,
   RunPlan,
@@ -15,6 +17,12 @@ import type {
 } from "@/lib/types";
 
 export type RunRecordPatch = Partial<Omit<RunRecord, "id" | "createdAt">>;
+
+export interface ListRunSummariesOptions {
+  limit?: number;
+  cursor?: string;
+  statusFilter?: RunStatus;
+}
 
 export interface QaStoreBackend {
   listEnvironmentLibraries(): Promise<EnvironmentLibraryRecord[]>;
@@ -25,16 +33,18 @@ export interface QaStoreBackend {
   getStoredCredentialLibrary(credentialLibraryId: string): Promise<StoredCredentialLibraryRecord | undefined>;
   upsertCredentialLibrary(input: CredentialLibraryInput, credentialLibraryId?: string): Promise<CredentialLibraryRecord>;
   touchCredentialLibraryLastUsed(credentialLibraryId: string, usedAt?: string): Promise<CredentialLibraryRecord | undefined>;
-  listScenarioLibraries(): Promise<ScenarioLibrary[]>;
+  listScenarioLibraries(options?: { includeArchived?: boolean }): Promise<ScenarioLibrary[]>;
   getScenarioLibrary(scenarioLibraryId: string): Promise<ScenarioLibrary | undefined>;
   upsertScenarioLibraryFromRun(
     plan: RunPlan,
     generated: GenerateScenariosResponse,
     sourceRunId?: string,
     scenarioLibraryId?: string,
-    libraryName?: string
+    libraryName?: string,
+    libraryAuthor?: string,
+    sourceRunInsights?: AnalysisInsight[]
   ): Promise<ScenarioLibrary>;
-  listRunSummaries(): Promise<RunSummary[]>;
+  listRunSummaries(options?: ListRunSummariesOptions): Promise<RunSummary[]>;
   listRuns(): Promise<RunRecord[]>;
   getRun(runId: string): Promise<RunRecord | undefined>;
   getRunArtifact(runId: string, artifactId: string): Promise<Artifact | undefined>;
@@ -51,4 +61,11 @@ export interface QaStoreBackend {
   requestRunCancellation(runId: string): Promise<RunRecord | undefined>;
   createRun(plan: RunPlan): Promise<RunRecord>;
   saveRun(record: RunRecord): Promise<RunRecord>;
+  renameScenarioLibrary(id: string, name: string): Promise<ScenarioLibrary>;
+  archiveScenarioLibrary(id: string): Promise<ScenarioLibrary>;
+  duplicateScenarioLibrary(id: string, newName: string): Promise<ScenarioLibrary>;
+  deleteRun(id: string): Promise<void>;
+  deleteCredentialLibrary(id: string): Promise<void>;
+  deleteEnvironmentLibrary(id: string): Promise<void>;
+  deleteScenarioLibrary(id: string): Promise<void>;
 }

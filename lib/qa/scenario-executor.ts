@@ -2,6 +2,8 @@ import type { BrowserContext, Locator, Page } from "playwright";
 
 import { buildRunArtifacts, captureScreenshot } from "@/lib/qa/artifact-builder";
 import type { AuthStateOutcome } from "@/lib/qa/auth-session";
+import { assertAuthBoundary, assertElementVisible } from "@/lib/qa/assertions";
+import type { NavTarget, PageSurface } from "@/lib/qa/crawl-model";
 import { discoverNavigationCandidates } from "@/lib/qa/navigation-discovery";
 import { buildDefects, buildTerminalRunRecord, createSyntheticStepResult } from "@/lib/qa/result-builder";
 import type { FailureCategory, RunPlan, RunRecord, Scenario, StepResult, StepStatus } from "@/lib/types";
@@ -131,14 +133,15 @@ async function executeAuthenticationBoundaryScenario(
   scenario: Scenario,
   authNote: string,
   deps: Pick<ScenarioExecutorDependencies, "pageHasLoginForm" | "buildProtectedRouteUrl" | "ensureAuthenticatedState" | "normalizeText">
-): Promise<{ status: StepStatus; observedTarget: string; actionResult: string; notes: string }> {
+): Promise<{ status: StepStatus; observedTarget: string; actionResult: string; notes: string; policyHandler: string }> {
   const browser = context.browser();
   if (!browser) {
     return {
       status: "blocked",
       observedTarget: deps.buildProtectedRouteUrl(plan),
       actionResult: "Unable to create a fresh browser context for the authentication boundary check.",
-      notes: authNote
+      notes: authNote,
+      policyHandler: "executeAuthScenario"
     };
   }
 
@@ -147,20 +150,14 @@ async function executeAuthenticationBoundaryScenario(
   const protectedRoute = deps.buildProtectedRouteUrl(plan);
 
   try {
-    await isolatedPage.goto(protectedRoute, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await isolatedPage.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
-
-    const sawLoginForm = await deps.pageHasLoginForm(isolatedPage);
-    const endedOnLogin = /login|signin|sign-in|auth/i.test(isolatedPage.url());
-    const remainedProtected = sawLoginForm || endedOnLogin || deps.normalizeText(isolatedPage.url()) !== deps.normalizeText(protectedRoute);
+    const result = await assertAuthBoundary(isolatedPage, protectedRoute);
 
     return {
-      status: remainedProtected ? "pass" : "fail",
+      status: result.passed ? "pass" : "fail",
       observedTarget: protectedRoute,
-      actionResult: remainedProtected
-        ? `Unauthenticated navigation to ${protectedRoute} redirected or prompted for authentication as expected.`
-        : `Unauthenticated navigation reached ${isolatedPage.url()} without an authentication challenge.`,
-      notes: `${authNote} Fresh-session check for ${scenario.title} ended at ${isolatedPage.url()}.`
+      actionResult: result.evidence,
+      notes: `${authNote} Fresh-session check for ${scenario.title}.`,
+      policyHandler: "executeAuthScenario"
     };
   } finally {
     await isolatedContext.close().catch(() => undefined);
@@ -168,11 +165,126 @@ async function executeAuthenticationBoundaryScenario(
   }
 }
 
+async function executeNavigationScenario(
+  page: Page,
+  scenario: Scenario,
+  matchedTargets: string[],
+  surface: PageSurface | undefined,
+  authNote: string,
+  deps: Pick<ScenarioExecutorDependencies, "firstVisibleByPatterns">
+): Promise<{ status: StepStatus; observedTarget: string; actionResult: string; notes: string; policyHandler: string }> {
+  const surfaceNavTargets: NavTarget[] = surface?.navTargets ?? [];
+  const scenarioText = `${scenario.title} ${scenario.steps.join(" ")} ${scenario.expectedResult}`.toLowerCase();
+
+  const surfaceMatch = surfaceNavTargets.find((t) =>
+    scenarioText.includes(t.label.toLowerCase()) || scenarioText.includes(t.resolvedUrl.toLowerCase())
+  );
+
+  const resolvedTargets = surfaceMatch ? [surfaceMatch.label, ...matchedTargets] : matchedTargets;
+
+  if (resolvedTargets.length === 0) {
+    return {
+      status: scenario.type === "exploratory" ? "pass" : "blocked",
+      observedTarget: scenario.title,
+      actionResult: scenario.type === "exploratory"
+        ? "Exploratory scenario recorded for manual follow-up; no deterministic target match was required."
+        : "No deterministic UI target from the saved scenario matched the current visible navigation.",
+      notes: `${authNote} PageSurface navTargets checked: ${surfaceNavTargets.length}.`,
+      policyHandler: "executeNavigationScenario"
+    };
+  }
+
+  for (const target of resolvedTargets) {
+    const control = await deps.firstVisibleByPatterns(page, [target]);
+    if (!control) {
+      const visibilityResult = await assertElementVisible(page, `text=${target}`, target);
+      if (!visibilityResult.passed) {
+        continue;
+      }
+    } else {
+      await control.click().catch(() => undefined);
+      await Promise.race([
+        page.waitForLoadState("networkidle", { timeout: 5_000 }),
+        page.waitForTimeout(1_000)
+      ]).catch(() => undefined);
+    }
+  }
+
+  return {
+    status: "pass",
+    observedTarget: resolvedTargets.join(", "),
+    actionResult: `Validated scenario targets against the live UI: ${resolvedTargets.join(", ")}.${surfaceMatch ? ` (PageSurface match: ${surfaceMatch.label})` : ""}`,
+    notes: authNote,
+    policyHandler: "executeNavigationScenario"
+  };
+}
+
+async function executeStateTransitionScenario(
+  page: Page,
+  scenario: Scenario,
+  matchedTargets: string[],
+  surface: PageSurface | undefined,
+  authNote: string,
+  deps: Pick<ScenarioExecutorDependencies, "toRegex" | "findFirstVisible" | "firstVisibleByPatterns">
+): Promise<{ status: StepStatus; observedTarget: string; actionResult: string; notes: string; policyHandler: string }> {
+  const surfaceInputs = surface?.inputs ?? [];
+  const scenarioText = `${scenario.title} ${scenario.steps.join(" ")} ${scenario.expectedResult}`.toLowerCase();
+
+  const surfaceInputMatch = surfaceInputs.find((i) => scenarioText.includes(i.label.toLowerCase()));
+
+  if (surfaceInputMatch) {
+    const visibilityResult = await assertElementVisible(page, surfaceInputMatch.selector, surfaceInputMatch.label);
+    if (visibilityResult.passed) {
+      return {
+        status: "pass",
+        observedTarget: surfaceInputMatch.label,
+        actionResult: `Located state-transition input "${surfaceInputMatch.label}" via PageSurface. ${visibilityResult.evidence}`,
+        notes: authNote,
+        policyHandler: "executeStateTransitionScenario"
+      };
+    }
+  }
+
+  const inputDiscovery = await tryLocateScenarioInputs(page, scenario, matchedTargets, deps);
+  const inputTarget = inputDiscovery.matchedHint ?? inputDiscovery.matchedView ?? matchedTargets[0] ?? scenario.title;
+  return {
+    status: inputDiscovery.inputs > 0 ? "pass" : "blocked",
+    observedTarget: inputTarget,
+    actionResult:
+      inputDiscovery.inputs > 0
+        ? inputDiscovery.matchedHint
+          ? `Located the scenario input target ${inputDiscovery.matchedHint}${inputDiscovery.matchedView ? ` under ${inputDiscovery.matchedView}` : ""}.`
+          : `Detected ${inputDiscovery.inputs} input control(s)${inputDiscovery.matchedView ? ` after opening ${inputDiscovery.matchedView}` : ""} while assessing ${scenario.title}.`
+        : "No visible form controls matching the saved state-focused scenario were found.",
+    notes: authNote,
+    policyHandler: "executeStateTransitionScenario"
+  };
+}
+
+async function executePermissionsScenario(
+  page: Page,
+  plan: RunPlan,
+  scenario: Scenario,
+  authNote: string,
+  deps: Pick<ScenarioExecutorDependencies, "buildProtectedRouteUrl">
+): Promise<{ status: StepStatus; observedTarget: string; actionResult: string; notes: string; policyHandler: string }> {
+  const protectedRoute = deps.buildProtectedRouteUrl(plan);
+  const result = await assertAuthBoundary(page, protectedRoute);
+  return {
+    status: result.passed ? "pass" : "fail",
+    observedTarget: protectedRoute,
+    actionResult: result.evidence,
+    notes: `${authNote} Permissions check for scenario "${scenario.title}".`,
+    policyHandler: "executePermissionsScenario"
+  };
+}
+
 async function executeScenarioCheck(
   page: Page,
   context: BrowserContext,
   plan: RunPlan,
   scenario: Scenario,
+  surface: PageSurface | undefined,
   deps: Pick<
     ScenarioExecutorDependencies,
     | "normalizeText"
@@ -185,7 +297,7 @@ async function executeScenarioCheck(
     | "ensureAuthenticatedState"
     | "buildProtectedRouteUrl"
   >
-): Promise<{ status: StepStatus; observedTarget: string; actionResult: string; notes: string }> {
+): Promise<{ status: StepStatus; observedTarget: string; actionResult: string; notes: string; policyHandler: string }> {
   const alternateCredentialRequirement = scenarioNeedsAlternateCredentials(scenario, deps.normalizeText);
 
   if (alternateCredentialRequirement.blocked) {
@@ -193,7 +305,8 @@ async function executeScenarioCheck(
       status: "blocked",
       observedTarget: scenario.title,
       actionResult: alternateCredentialRequirement.reason ?? "Scenario requires credentials not configured for this run.",
-      notes: "The scenario was reviewed but could not be safely executed with the current credential set."
+      notes: "The scenario was reviewed but could not be safely executed with the current credential set.",
+      policyHandler: "blocked-credential-check"
     };
   }
 
@@ -203,56 +316,19 @@ async function executeScenarioCheck(
   const scenarioText = deps.normalizeText(`${scenario.title} ${scenario.steps.join(" ")} ${scenario.expectedResult}`);
   const matchedTargets = currentCandidates.filter((candidate: string) => scenarioText.includes(deps.normalizeText(candidate))).slice(0, 3);
 
-  if (scenario.type === "negative") {
-    return executeAuthenticationBoundaryScenario(page, context, plan, scenario, authNote, deps);
+  switch (scenario.type) {
+    case "negative":
+      return executeAuthenticationBoundaryScenario(page, context, plan, scenario, authNote, deps);
+
+    case "permissions":
+      return executePermissionsScenario(page, plan, scenario, authNote, deps);
+
+    case "state-transition":
+      return executeStateTransitionScenario(page, scenario, matchedTargets, surface, authNote, deps);
+
+    default:
+      return executeNavigationScenario(page, scenario, matchedTargets, surface, authNote, deps);
   }
-
-  if (scenario.type === "state-transition") {
-    const inputDiscovery = await tryLocateScenarioInputs(page, scenario, currentCandidates, deps);
-    const inputTarget = inputDiscovery.matchedHint ?? inputDiscovery.matchedView ?? matchedTargets[0] ?? scenario.title;
-    return {
-      status: inputDiscovery.inputs > 0 ? "pass" : "blocked",
-      observedTarget: inputTarget,
-      actionResult:
-        inputDiscovery.inputs > 0
-          ? inputDiscovery.matchedHint
-            ? `Located the scenario input target ${inputDiscovery.matchedHint}${inputDiscovery.matchedView ? ` under ${inputDiscovery.matchedView}` : ""}.`
-            : `Detected ${inputDiscovery.inputs} input control(s)${inputDiscovery.matchedView ? ` after opening ${inputDiscovery.matchedView}` : ""} while assessing ${scenario.title}.`
-          : "No visible form controls matching the saved state-focused scenario were found.",
-      notes: authNote
-    };
-  }
-
-  if (matchedTargets.length === 0) {
-    return {
-      status: scenario.type === "exploratory" ? "pass" : "blocked",
-      observedTarget: scenario.title,
-      actionResult: scenario.type === "exploratory"
-        ? "Exploratory scenario recorded for manual follow-up; no deterministic target match was required."
-        : "No deterministic UI target from the saved scenario matched the current visible navigation.",
-      notes: `${authNote} Visible navigation candidates: ${currentCandidates.join(", ") || "none"}.`
-    };
-  }
-
-  for (const target of matchedTargets) {
-    const control = await deps.firstVisibleByPatterns(page, [target]);
-    if (!control) {
-      continue;
-    }
-
-    await control.click().catch(() => undefined);
-    await Promise.race([
-      page.waitForLoadState("networkidle", { timeout: 5_000 }),
-      page.waitForTimeout(1_000)
-    ]).catch(() => undefined);
-  }
-
-  return {
-    status: "pass",
-    observedTarget: matchedTargets.join(", "),
-    actionResult: `Validated scenario targets against the live UI: ${matchedTargets.join(", ")}.`,
-    notes: authNote
-  };
 }
 
 export async function executeScenarioSuiteRun(
@@ -271,7 +347,7 @@ export async function executeScenarioSuiteRun(
         stepNumber: index + 1,
         scenarioTitle: scenario.title
       });
-      const outcome = await executeScenarioCheck(page, context, record.plan, scenario, deps);
+      const outcome = await executeScenarioCheck(page, context, record.plan, scenario, record.pageSurfaceSnapshot, deps);
       const screenshotLabel = `Scenario ${index + 1}`;
       const screenshotArtifact = await captureScreenshot(page, record.id, index + 1, screenshotLabel);
       screenshotArtifacts.push(screenshotArtifact);
@@ -284,7 +360,8 @@ export async function executeScenarioSuiteRun(
         outcome.status,
         `${scenario.type} · ${scenario.expectedResult} ${outcome.notes}`.trim(),
         screenshotLabel,
-        screenshotArtifact.id
+        screenshotArtifact.id,
+        outcome.policyHandler
       );
       stepResults.push(stepResult);
 

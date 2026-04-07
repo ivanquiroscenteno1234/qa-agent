@@ -1,4 +1,5 @@
 import type {
+  AnalysisInsight,
   Artifact,
   CredentialLibraryInput,
   CredentialLibraryRecord,
@@ -57,8 +58,8 @@ export async function touchCredentialLibraryLastUsed(
   return getQaStoreBackend().touchCredentialLibraryLastUsed(credentialLibraryId, usedAt);
 }
 
-export async function listScenarioLibraries(): Promise<ScenarioLibrary[]> {
-  return getQaStoreBackend().listScenarioLibraries();
+export async function listScenarioLibraries(options?: { includeArchived?: boolean }): Promise<ScenarioLibrary[]> {
+  return getQaStoreBackend().listScenarioLibraries(options);
 }
 
 export async function getScenarioLibrary(scenarioLibraryId: string): Promise<ScenarioLibrary | undefined> {
@@ -70,17 +71,19 @@ export async function upsertScenarioLibraryFromRun(
   generated: GenerateScenariosResponse,
   sourceRunId?: string,
   scenarioLibraryId?: string,
-  libraryName?: string
+  libraryName?: string,
+  libraryAuthor?: string,
+  sourceRunInsights?: AnalysisInsight[]
 ): Promise<ScenarioLibrary> {
-  return getQaStoreBackend().upsertScenarioLibraryFromRun(plan, generated, sourceRunId, scenarioLibraryId, libraryName);
+  return getQaStoreBackend().upsertScenarioLibraryFromRun(plan, generated, sourceRunId, scenarioLibraryId, libraryName, libraryAuthor, sourceRunInsights);
 }
 
 export async function listRuns(): Promise<RunRecord[]> {
   return getQaStoreBackend().listRuns();
 }
 
-export async function listRunSummaries(): Promise<RunSummary[]> {
-  return getQaStoreBackend().listRunSummaries();
+export async function listRunSummaries(options?: import("@/lib/qa/storage/types").ListRunSummariesOptions): Promise<RunSummary[]> {
+  return getQaStoreBackend().listRunSummaries(options);
 }
 
 export async function getRun(runId: string): Promise<RunRecord | undefined> {
@@ -123,4 +126,32 @@ export async function createRun(plan: RunPlan): Promise<RunRecord> {
 
 export async function saveRun(record: RunRecord): Promise<RunRecord> {
   return getQaStoreBackend().saveRun(record);
+}
+
+export async function renameScenarioLibrary(id: string, name: string): Promise<ScenarioLibrary> {
+  return getQaStoreBackend().renameScenarioLibrary(id, name);
+}
+
+export async function archiveScenarioLibrary(id: string): Promise<ScenarioLibrary> {
+  return getQaStoreBackend().archiveScenarioLibrary(id);
+}
+
+export async function duplicateScenarioLibrary(id: string, newName: string): Promise<ScenarioLibrary> {
+  return getQaStoreBackend().duplicateScenarioLibrary(id, newName);
+}
+
+export async function deleteRun(id: string): Promise<void> {
+  return getQaStoreBackend().deleteRun(id);
+}
+
+export async function deleteCredentialLibrary(id: string): Promise<void> {
+  return getQaStoreBackend().deleteCredentialLibrary(id);
+}
+
+export async function deleteEnvironmentLibrary(id: string): Promise<void> {
+  return getQaStoreBackend().deleteEnvironmentLibrary(id);
+}
+
+export async function deleteScenarioLibrary(id: string): Promise<void> {
+  return getQaStoreBackend().deleteScenarioLibrary(id);
 }

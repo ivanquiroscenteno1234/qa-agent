@@ -20,6 +20,33 @@ This workspace now contains an initial implementation of the QA web testing agen
 - event-streaming execution updates
 - recursive cross-route exploration beyond the current top-level navigation walk
 
+## Current Fit
+
+The current MVP is useful across most conventional web applications when the target has:
+
+- standard username and password login flows
+- visible navigation and section labels
+- common form-driven workflows
+- straightforward visibility and editability checks
+- settings or configuration surfaces with visible edit affordances
+
+It remains strongest on guided step execution, exploratory discovery, evidence capture, and lightweight deterministic checks.
+
+Known current limits still include:
+
+- role and permission boundary workflows that need stronger dedicated evidence
+- targets with weak accessibility metadata or ambiguous visible labels
+- SSO, MFA, CAPTCHA, iframe-heavy, upload/download, drag-and-drop, and canvas-heavy interaction models
+
+It should not yet be described as a universal QA agent for arbitrary web applications.
+
+## Documentation
+
+- [QA Agent Operator Guide](docs/QA_AGENT_OPERATOR_GUIDE.md)
+- [Target App Compatibility Matrix](docs/QA_AGENT_TARGET_APP_COMPATIBILITY_MATRIX.md)
+- [Arbitrary Web App Readiness Roadmap](docs/plans/QA_AGENT_ARBITRARY_WEB_APP_READINESS_ROADMAP.md)
+- [Security Notes](docs/SECURITY_NOTES.md)
+
 ## Run locally
 
 ```bash

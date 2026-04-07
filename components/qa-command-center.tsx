@@ -273,6 +273,16 @@ async function requestJson<TResponse>(method: "POST" | "PATCH", url: string, pay
   return response.json() as Promise<TResponse>;
 }
 
+async function deleteResource(url: string): Promise<void> {
+  const response = await fetch(url, { method: "DELETE" });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as ApiErrorPayload | null;
+    const message = body?.error?.message ?? `Delete failed with status ${response.status}`;
+    throw new Error(message);
+  }
+}
+
 function routeForWorkflowView(view: WorkflowView): Route {
   switch (view) {
     case "monitor":
@@ -292,6 +302,7 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
   const [environmentLibraryName, setEnvironmentLibraryName] = useState<string>(() => buildEnvironmentLibraryNameFallback(createEmptyPlan()));
   const [credentialLibraryName, setCredentialLibraryName] = useState<string>(() => buildCredentialLibraryNameFallback(createEmptyPlan()));
   const [scenarioLibraryName, setScenarioLibraryName] = useState<string>(() => buildScenarioLibraryNameFallback(createEmptyPlan()));
+  const [scenarioLibraryAuthor, setScenarioLibraryAuthor] = useState<string>("");
   const [parsePreview, setParsePreview] = useState<ParseStepsResponse | null>(null);
   const [scenarioPreview, setScenarioPreview] = useState<GenerateScenariosResponse | null>(null);
   const [environmentLibraries, setEnvironmentLibraries] = useState<EnvironmentLibraryRecord[]>([]);
@@ -307,7 +318,7 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
   const [workflowView, setWorkflowView] = useState<WorkflowView>(initialWorkflowView);
   const [isPending, startTransition] = useTransition();
   const previousSelectedRunStatusRef = useRef<RunStatus | null>(null);
-  const pollInFlightRef = useRef(false);
+  const disposedRef = useRef(false);
   const handledDraftHandoffRef = useRef<string | null>(null);
   const selectedRunSummary = selectedRunId ? runs.find((run) => run.id === selectedRunId) ?? null : null;
   const activeSelectedRun = selectedRun?.id === selectedRunId ? selectedRun : null;
@@ -418,20 +429,37 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
       return;
     }
 
-    let disposed = false;
+    disposedRef.current = false;
+    const controller = new AbortController();
+    let requestInFlight = false;
     const shouldFetchEvents = Boolean(selectedRunSummary && isActiveRun(selectedRunSummary.status));
 
     const loadRunState = async () => {
-      if (disposed || pollInFlightRef.current) {
+      if (disposedRef.current || requestInFlight) {
         return;
       }
 
-      pollInFlightRef.current = true;
+      requestInFlight = true;
 
       try {
-        const runResponse = await fetch(`/api/runs/${selectedRunId}`, { cache: "no-store" });
+        const runResponse = await fetch(`/api/runs/${selectedRunId}`, { cache: "no-store", signal: controller.signal });
 
-        if (disposed) {
+        if (disposedRef.current) {
+          return;
+        }
+
+        if (runResponse.status === 404) {
+          setRuns((current) => {
+            const remainingRuns = current.filter((run) => run.id !== selectedRunId);
+            const fallbackRun = remainingRuns.find((run) => isActiveRun(run.status)) ?? remainingRuns[0] ?? null;
+
+            setSelectedRunId(fallbackRun?.id ?? null);
+            return remainingRuns;
+          });
+          setSelectedRun(null);
+          setRunEvents([]);
+          setRunWarnings([]);
+          setFeedback("The selected run no longer exists. Showing the next available run.");
           return;
         }
 
@@ -446,12 +474,12 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
           }
         }
 
-        if (!shouldFetchEvents || disposed) {
+        if (!shouldFetchEvents || disposedRef.current) {
           return;
         }
 
-        const eventsResponse = await fetch(`/api/runs/${selectedRunId}/events`, { cache: "no-store" });
-        if (disposed) {
+        const eventsResponse = await fetch(`/api/runs/${selectedRunId}/events`, { cache: "no-store", signal: controller.signal });
+        if (disposedRef.current) {
           return;
         }
 
@@ -461,11 +489,14 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
           setRunWarnings(eventData.warnings);
         }
       } catch (error) {
-        if (!disposed) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        if (!disposedRef.current) {
           setFeedback((current) => current.startsWith("Unable to refresh") ? current : "Unable to refresh live run status. Retrying automatically.");
         }
       } finally {
-        pollInFlightRef.current = false;
+        requestInFlight = false;
       }
     };
 
@@ -473,7 +504,8 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
 
     if (!selectedRunSummary || !isActiveRun(selectedRunSummary.status)) {
       return () => {
-        disposed = true;
+        disposedRef.current = true;
+        controller.abort();
       };
     }
 
@@ -482,9 +514,10 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
     }, 1500);
 
     return () => {
-      disposed = true;
+      disposedRef.current = true;
       window.clearInterval(intervalId);
-      pollInFlightRef.current = false;
+      requestInFlight = false;
+      controller.abort();
     };
   }, [selectedRunId, selectedRunSummary]);
 
@@ -659,6 +692,7 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
     updatePlan("targetUrl", selectedLibrary.targetUrl);
     updatePlan("role", selectedLibrary.role);
     setScenarioLibraryName(selectedLibrary.name);
+    setScenarioLibraryAuthor(selectedLibrary.author ?? "");
     setFeedback(feedbackMessage ?? `Loaded saved scenario library ${selectedLibrary.name}.`);
   }
 
@@ -782,7 +816,8 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
       generated,
       sourceRunId: options?.sourceRunId,
       scenarioLibraryId: options?.scenarioLibraryId,
-      name: scenarioLibraryName.trim()
+      name: scenarioLibraryName.trim(),
+      author: scenarioLibraryAuthor.trim() || undefined
     });
 
     await refreshScenarioLibraries();
@@ -887,7 +922,8 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
             riskSummary: run.riskSummary
           },
           sourceRunId: run.id,
-          name: `${run.plan.featureArea} (${run.plan.environment})`
+          name: `${run.plan.featureArea} (${run.plan.environment})`,
+          sourceRunInsights: run.analysisInsights.length ? run.analysisInsights : undefined
         });
 
         await refreshScenarioLibraries();
@@ -915,7 +951,8 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
           },
           sourceRunId: run.id,
           scenarioLibraryId: run.plan.scenarioLibraryId,
-          name: selectedRunScenarioLibrary?.name ?? `${run.plan.featureArea} (${run.plan.environment})`
+          name: selectedRunScenarioLibrary?.name ?? `${run.plan.featureArea} (${run.plan.environment})`,
+          sourceRunInsights: run.analysisInsights.length ? run.analysisInsights : undefined
         });
 
         await refreshScenarioLibraries();
@@ -1126,6 +1163,7 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
           environmentLibraryName={environmentLibraryName}
           credentialLibraryName={credentialLibraryName}
           scenarioLibraryName={scenarioLibraryName}
+          scenarioLibraryAuthor={scenarioLibraryAuthor}
           planWarnings={planWarnings}
           feedback={feedback}
           isPending={isPending}
@@ -1135,6 +1173,7 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
           onEnvironmentLibraryNameChange={setEnvironmentLibraryName}
           onCredentialLibraryNameChange={setCredentialLibraryName}
           onScenarioLibraryNameChange={setScenarioLibraryName}
+          onScenarioLibraryAuthorChange={setScenarioLibraryAuthor}
           onSelectEnvironmentLibrary={handleEnvironmentLibrarySelection}
           onSelectCredentialLibrary={handleCredentialLibrarySelection}
           onSelectScenarioLibrary={handleScenarioLibrarySelection}

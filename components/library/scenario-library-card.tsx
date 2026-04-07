@@ -1,8 +1,14 @@
+import Link from "next/link";
+import type { Route } from "next";
 import type { ScenarioLibrary } from "@/lib/types";
 
 interface ScenarioLibraryCardProps {
   library: ScenarioLibrary;
   onRun?: (library: ScenarioLibrary) => void;
+  onRename?: (library: ScenarioLibrary) => void;
+  onArchive?: (library: ScenarioLibrary) => void;
+  onDuplicate?: (library: ScenarioLibrary) => void;
+  onDelete?: (library: ScenarioLibrary) => void;
 }
 
 function deriveRiskBand(library: ScenarioLibrary): "High Risk" | "Med Risk" | "Low Risk" {
@@ -28,7 +34,7 @@ function buildTags(library: ScenarioLibrary): string[] {
   return tags;
 }
 
-export function ScenarioLibraryCard({ library, onRun }: ScenarioLibraryCardProps) {
+export function ScenarioLibraryCard({ library, onRun, onRename, onArchive, onDuplicate, onDelete }: ScenarioLibraryCardProps) {
   const riskBand = deriveRiskBand(library);
   const tags = buildTags(library);
   const latestVersion = library.versions[library.versions.length - 1];
@@ -48,17 +54,20 @@ export function ScenarioLibraryCard({ library, onRun }: ScenarioLibraryCardProps
           <button type="button" onClick={() => onRun?.(library)} disabled={!onRun} title="Load this library into Draft and prepare a new run.">
             Run
           </button>
-          <button type="button" disabled title="Version history detail route is planned next.">
+          <Link href={`/library/${library.id}` as Route} className="scenario-library-history-link" title="View full version history for this scenario library.">
             History
-          </button>
-          <button type="button" disabled title="Rename requires an API route that does not exist yet.">
+          </Link>
+          <button type="button" disabled={!onRename} onClick={() => onRename?.(library)} title="Rename this scenario library.">
             Rename
           </button>
-          <button type="button" disabled title="Archive requires backend support that is not implemented yet.">
+          <button type="button" disabled={!onArchive} onClick={() => onArchive?.(library)} title="Archive this scenario library.">
             Archive
           </button>
-          <button type="button" disabled title="Duplicate requires backend support that is not implemented yet.">
+          <button type="button" disabled={!onDuplicate} onClick={() => onDuplicate?.(library)} title="Duplicate this scenario library.">
             Duplicate
+          </button>
+          <button type="button" disabled={!onDelete} onClick={() => onDelete?.(library)} title="Permanently delete this scenario library.">
+            Delete
           </button>
         </div>
       </div>

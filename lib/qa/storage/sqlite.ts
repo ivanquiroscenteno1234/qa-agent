@@ -4,6 +4,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 
 import type {
+  AnalysisInsight,
   Artifact,
   CredentialLibraryInput,
   CredentialLibraryRecord,
@@ -21,8 +22,8 @@ import type {
   StoredCredentialLibraryRecord
 } from "@/lib/types";
 import { buildScenarioLibraryComparison } from "@/lib/qa/scenario-library";
-import { generateScenarios } from "@/lib/qa/scenario-generator";
-import { parsePlainTextSteps } from "@/lib/qa/step-parser";
+import { generateScenariosWithLlm } from "@/lib/qa/scenario-generator";
+import { parseStepsWithLlm } from "@/lib/qa/step-parser";
 import { readSeedDataFromJsonStoreSync } from "@/lib/qa/storage/json-store";
 import { dataDirectory, sqliteDatabasePath, sqliteMigrationsDirectory } from "@/lib/qa/storage/paths";
 import {
@@ -114,6 +115,7 @@ type ScenarioLibraryVersionRow = {
   scenario_count: number;
   summary: string;
   change_summary_json: string;
+  baseline_insights_json: string;
 };
 type ScenarioLibraryScenarioRow = {
   scenario_id: string;
@@ -333,20 +335,25 @@ function readScenarioLibraryVersions(db: Database.Database, libraryId: string): 
       source_run_id,
       scenario_count,
       summary,
-      change_summary_json
+      change_summary_json,
+      baseline_insights_json
     FROM scenario_library_versions
     WHERE library_id = ?
     ORDER BY version ASC`
   ).all(libraryId) as ScenarioLibraryVersionRow[];
 
-  return rows.map((row) => ({
-    version: row.version,
-    createdAt: row.created_at,
-    sourceRunId: row.source_run_id ?? undefined,
-    scenarioCount: row.scenario_count,
-    summary: row.summary,
-    changeSummary: JSON.parse(row.change_summary_json) as ScenarioLibrary["versions"][number]["changeSummary"]
-  }));
+  return rows.map((row) => {
+    const baselineInsights = JSON.parse(row.baseline_insights_json || '[]') as AnalysisInsight[];
+    return {
+      version: row.version,
+      createdAt: row.created_at,
+      sourceRunId: row.source_run_id ?? undefined,
+      scenarioCount: row.scenario_count,
+      summary: row.summary,
+      changeSummary: JSON.parse(row.change_summary_json) as ScenarioLibrary["versions"][number]["changeSummary"],
+      ...(baselineInsights.length ? { baselineInsights } : {})
+    };
+  });
 }
 
 function readScenarioLibraryScenarios(db: Database.Database, libraryId: string): Scenario[] {
@@ -703,8 +710,8 @@ function writeScenarioLibraryRecord(db: Database.Database, library: ScenarioLibr
   const normalized = normalizeScenarioLibraryRecord(library);
   const transaction = db.transaction((nextLibrary: ScenarioLibrary) => {
     db.prepare(
-      "INSERT INTO scenario_libraries (id, name, updated_at, payload) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, payload = excluded.payload"
-    ).run(nextLibrary.id, nextLibrary.name, nextLibrary.updatedAt, JSON.stringify(nextLibrary));
+      "INSERT INTO scenario_libraries (id, name, status, author, updated_at, payload) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, status = excluded.status, author = excluded.author, updated_at = excluded.updated_at, payload = excluded.payload"
+    ).run(nextLibrary.id, nextLibrary.name, nextLibrary.status ?? "active", nextLibrary.author ?? "", nextLibrary.updatedAt, JSON.stringify(nextLibrary));
 
     db.prepare(
       `INSERT INTO scenario_library_details (
@@ -753,8 +760,9 @@ function writeScenarioLibraryRecord(db: Database.Database, library: ScenarioLibr
         source_run_id,
         scenario_count,
         summary,
-        change_summary_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        change_summary_json,
+        baseline_insights_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     );
     const insertScenario = db.prepare(
       `INSERT INTO scenario_library_scenarios (
@@ -780,7 +788,8 @@ function writeScenarioLibraryRecord(db: Database.Database, library: ScenarioLibr
         version.sourceRunId ?? null,
         version.scenarioCount,
         version.summary,
-        JSON.stringify(version.changeSummary)
+        JSON.stringify(version.changeSummary),
+        JSON.stringify(version.baselineInsights ?? [])
       );
     }
 
@@ -1031,8 +1040,9 @@ function createSqliteStoreBackend(): QaStoreBackend {
 
       return sanitizeCredentialLibraryRecord(credential);
     },
-    async listScenarioLibraries(): Promise<ScenarioLibrary[]> {
-      return listScenarioLibrariesInternal();
+    async listScenarioLibraries(options?: { includeArchived?: boolean }): Promise<ScenarioLibrary[]> {
+      const all = listScenarioLibrariesInternal();
+      return options?.includeArchived ? all : all.filter((l) => (l.status ?? "active") === "active");
     },
     async getScenarioLibrary(scenarioLibraryId: string): Promise<ScenarioLibrary | undefined> {
       return getScenarioLibraryInternal(scenarioLibraryId);
@@ -1042,22 +1052,37 @@ function createSqliteStoreBackend(): QaStoreBackend {
       generated: GenerateScenariosResponse,
       sourceRunId?: string,
       scenarioLibraryId?: string,
-      libraryName?: string
+      libraryName?: string,
+      libraryAuthor?: string,
+      sourceRunInsights?: AnalysisInsight[]
     ): Promise<ScenarioLibrary> {
       const libraries = listScenarioLibrariesInternal();
       const now = new Date().toISOString();
       const existing = scenarioLibraryId
         ? libraries.find((library) => library.id === scenarioLibraryId)
         : findExistingScenarioLibraryForCreate(libraries, plan, libraryName);
-      return writeScenarioLibrary(buildScenarioLibraryRecord(existing, plan, generated, now, sourceRunId, libraryName));
+      return writeScenarioLibrary(buildScenarioLibraryRecord(existing, plan, generated, now, sourceRunId, libraryName, libraryAuthor, sourceRunInsights));
     },
     async listRuns(): Promise<RunRecord[]> {
       return listRunsInternal();
     },
-    async listRunSummaries(): Promise<RunSummary[]> {
+    async listRunSummaries(options?: import("@/lib/qa/storage/types").ListRunSummariesOptions): Promise<RunSummary[]> {
       const db = openDatabase();
-      const summaries = listRunSummariesFromSql(db);
-      return summaries.length ? summaries : listRunsInternal().map(buildRunSummary);
+      let summaries = listRunSummariesFromSql(db);
+      if (!summaries.length) {
+        summaries = listRunsInternal().map(buildRunSummary);
+      }
+      if (options?.statusFilter) {
+        summaries = summaries.filter((s) => s.status === options.statusFilter);
+      }
+      if (options?.cursor) {
+        const idx = summaries.findIndex((s) => s.id === options.cursor);
+        if (idx !== -1) summaries = summaries.slice(idx + 1);
+      }
+      if (options?.limit != null && options.limit > 0) {
+        summaries = summaries.slice(0, options.limit);
+      }
+      return summaries;
     },
     async getRun(runId: string): Promise<RunRecord | undefined> {
       return getRunInternal(runId);
@@ -1153,14 +1178,17 @@ function createSqliteStoreBackend(): QaStoreBackend {
       });
     },
     async createRun(plan: RunPlan): Promise<RunRecord> {
-      const parsed = parsePlainTextSteps(plan.stepsText);
+      const parsed = await parseStepsWithLlm(
+        plan.stepsText,
+        `${plan.featureArea} | ${plan.objective} | ${plan.targetUrl}`
+      );
       const scenarioLibraries = listScenarioLibrariesInternal();
       const selectedLibrary = plan.scenarioLibraryId
         ? scenarioLibraries.find((library) => library.id === plan.scenarioLibraryId)
         : undefined;
       const generated = selectedLibrary
         ? { scenarios: selectedLibrary.scenarios, coverageGaps: selectedLibrary.coverageGaps, riskSummary: selectedLibrary.riskSummary }
-        : generateScenarios(plan);
+        : await generateScenariosWithLlm(plan);
       const now = new Date().toISOString();
       return writeRun(sanitizeRunRecordContent({
         id: createId("run"),
@@ -1199,6 +1227,91 @@ function createSqliteStoreBackend(): QaStoreBackend {
         );
       }
       return savedRecord;
+    },
+    async deleteRun(id: string): Promise<void> {
+      const db = openDatabase();
+      db.prepare("DELETE FROM runs WHERE id = ?").run(id);
+    },
+    async deleteCredentialLibrary(id: string): Promise<void> {
+      const db = openDatabase();
+      const activeCount = (db.prepare(
+        "SELECT COUNT(*) AS count FROM runs WHERE JSON_EXTRACT(payload, '$.plan.credentialLibraryId') = ? AND status IN ('queued', 'running')"
+      ).get(id) as { count: number }).count;
+      if (activeCount > 0) {
+        throw new Error("CREDENTIAL_IN_USE");
+      }
+      db.prepare("DELETE FROM credential_libraries WHERE id = ?").run(id);
+    },
+    async deleteEnvironmentLibrary(id: string): Promise<void> {
+      const db = openDatabase();
+      const activeCount = (db.prepare(
+        "SELECT COUNT(*) AS count FROM runs WHERE JSON_EXTRACT(payload, '$.plan.environmentLibraryId') = ? AND status IN ('queued', 'running')"
+      ).get(id) as { count: number }).count;
+      if (activeCount > 0) {
+        throw new Error("ENVIRONMENT_IN_USE");
+      }
+      db.prepare("DELETE FROM environment_libraries WHERE id = ?").run(id);
+    },
+    async duplicateScenarioLibrary(id: string, newName: string): Promise<ScenarioLibrary> {
+      const source = getScenarioLibraryInternal(id);
+      if (!source) {
+        throw new Error("NOT_FOUND");
+      }
+      const now = new Date().toISOString();
+      const newScenarios = source.scenarios.map((s) => ({ ...s, id: createId("scenario") }));
+      const newLibrary = normalizeScenarioLibraryRecord({
+        ...source,
+        id: createId("scenario_library"),
+        name: newName,
+        status: "active" as const,
+        sourceRunId: undefined,
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
+        versions: [],
+        scenarios: newScenarios
+      });
+      return writeScenarioLibrary(newLibrary);
+    },
+    async archiveScenarioLibrary(id: string): Promise<ScenarioLibrary> {
+      const db = openDatabase();
+      const updatedAt = new Date().toISOString();
+      const result = db.prepare(
+        "UPDATE scenario_libraries SET status = 'archived', updated_at = ?, payload = JSON_SET(payload, '$.status', 'archived') WHERE id = ?"
+      ).run(updatedAt, id);
+      if (result.changes === 0) {
+        throw new Error("NOT_FOUND");
+      }
+      const updated = hydrateScenarioLibrary(db, db.prepare("SELECT id, payload FROM scenario_libraries WHERE id = ?").get(id) as ScenarioLibraryRow | undefined);
+      if (!updated) {
+        throw new Error("NOT_FOUND");
+      }
+      return updated;
+    },
+    async renameScenarioLibrary(id: string, name: string): Promise<ScenarioLibrary> {
+      const db = openDatabase();
+      const updatedAt = new Date().toISOString();
+      const result = db.prepare(
+        "UPDATE scenario_libraries SET name = ?, updated_at = ?, payload = JSON_SET(payload, '$.name', ?) WHERE id = ?"
+      ).run(name, updatedAt, name, id);
+      if (result.changes === 0) {
+        throw new Error("NOT_FOUND");
+      }
+      const updated = hydrateScenarioLibrary(db, db.prepare("SELECT id, payload FROM scenario_libraries WHERE id = ?").get(id) as ScenarioLibraryRow | undefined);
+      if (!updated) {
+        throw new Error("NOT_FOUND");
+      }
+      return updated;
+    },
+    async deleteScenarioLibrary(id: string): Promise<void> {
+      const db = openDatabase();
+      const activeCount = (db.prepare(
+        "SELECT COUNT(*) AS count FROM run_details WHERE scenario_library_id = ? AND run_id IN (SELECT id FROM runs WHERE status IN ('queued', 'running'))"
+      ).get(id) as { count: number }).count;
+      if (activeCount > 0) {
+        throw new Error("SCENARIO_LIBRARY_IN_USE");
+      }
+      db.prepare("DELETE FROM scenario_libraries WHERE id = ?").run(id);
     }
   };
 }

@@ -1,4 +1,5 @@
 import type {
+  AnalysisInsight,
   Scenario,
   ScenarioLibrary,
   ScenarioLibraryChangeSummary,
@@ -85,7 +86,8 @@ export function formatScenarioLibraryChangeSummary(changeSummary: ScenarioLibrar
 export function createInitialScenarioLibraryVersion(
   scenarios: Scenario[],
   createdAt: string,
-  sourceRunId?: string
+  sourceRunId?: string,
+  baselineInsights?: AnalysisInsight[]
 ): ScenarioLibraryVersion {
   const changeSummary: ScenarioLibraryChangeSummary = {
     reused: 0,
@@ -103,7 +105,8 @@ export function createInitialScenarioLibraryVersion(
     sourceRunId,
     scenarioCount: scenarios.length,
     summary: `Initial library snapshot with ${scenarios.length} scenario(s).`,
-    changeSummary
+    changeSummary,
+    ...(baselineInsights?.length ? { baselineInsights } : {})
   };
 }
 
@@ -112,7 +115,8 @@ export function createScenarioLibraryVersion(
   previousScenarios: Scenario[],
   nextScenarios: Scenario[],
   createdAt: string,
-  sourceRunId?: string
+  sourceRunId?: string,
+  baselineInsights?: AnalysisInsight[]
 ): ScenarioLibraryVersion {
   const changeSummary = summarizeScenarioLibraryChanges(previousScenarios, nextScenarios);
 
@@ -122,7 +126,8 @@ export function createScenarioLibraryVersion(
     sourceRunId,
     scenarioCount: nextScenarios.length,
     summary: formatScenarioLibraryChangeSummary(changeSummary),
-    changeSummary
+    changeSummary,
+    ...(baselineInsights?.length ? { baselineInsights } : {})
   };
 }
 
@@ -134,6 +139,8 @@ export function normalizeScenarioLibrary(library: ScenarioLibrary): ScenarioLibr
 
   return {
     ...library,
+    author: library.author ?? "",
+    status: library.status ?? "active",
     version: library.version ?? latestVersion.version,
     versions
   };

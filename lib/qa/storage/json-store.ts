@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 
 import type {
+  AnalysisInsight,
   Artifact,
   CredentialLibraryInput,
   CredentialLibraryRecord,
@@ -18,8 +19,8 @@ import type {
   StoredCredentialLibraryRecord
 } from "@/lib/types";
 import { buildScenarioLibraryComparison } from "@/lib/qa/scenario-library";
-import { generateScenarios } from "@/lib/qa/scenario-generator";
-import { parsePlainTextSteps } from "@/lib/qa/step-parser";
+import { generateScenariosWithLlm } from "@/lib/qa/scenario-generator";
+import { parseStepsWithLlm } from "@/lib/qa/step-parser";
 import {
   credentialLibraryStorePath,
   dataDirectory,
@@ -303,8 +304,9 @@ function createJsonStoreBackend(): QaStoreBackend {
       await writeStoredCredentialLibraries(nextLibraries);
       return sanitizeCredentialLibraryRecord(nextLibrary);
     },
-    async listScenarioLibraries(): Promise<ScenarioLibrary[]> {
-      return sortScenarioLibraries(await readScenarioLibraries());
+    async listScenarioLibraries(options?: { includeArchived?: boolean }): Promise<ScenarioLibrary[]> {
+      const all = sortScenarioLibraries(await readScenarioLibraries());
+      return options?.includeArchived ? all : all.filter((l) => (l.status ?? "active") === "active");
     },
     async getScenarioLibrary(scenarioLibraryId: string): Promise<ScenarioLibrary | undefined> {
       const libraries = await readScenarioLibraries();
@@ -315,14 +317,16 @@ function createJsonStoreBackend(): QaStoreBackend {
       generated: GenerateScenariosResponse,
       sourceRunId?: string,
       scenarioLibraryId?: string,
-      libraryName?: string
+      libraryName?: string,
+      libraryAuthor?: string,
+      sourceRunInsights?: AnalysisInsight[]
     ): Promise<ScenarioLibrary> {
       const libraries = await readScenarioLibraries();
       const now = new Date().toISOString();
       const existing = scenarioLibraryId
         ? libraries.find((library) => library.id === scenarioLibraryId)
         : findExistingScenarioLibraryForCreate(libraries, plan, libraryName);
-      const nextLibrary = buildScenarioLibraryRecord(existing, plan, generated, now, sourceRunId, libraryName);
+      const nextLibrary = buildScenarioLibraryRecord(existing, plan, generated, now, sourceRunId, libraryName, libraryAuthor, sourceRunInsights);
       const nextLibraries = existing
         ? libraries.map((library) => (library.id === existing.id ? nextLibrary : library))
         : [nextLibrary, ...libraries];
@@ -332,8 +336,21 @@ function createJsonStoreBackend(): QaStoreBackend {
     async listRuns(): Promise<RunRecord[]> {
       return sortRuns(await readRuns());
     },
-    async listRunSummaries(): Promise<RunSummary[]> {
-      return sortRuns(await readRuns()).map(buildRunSummary);
+    async listRunSummaries(options?: import("@/lib/qa/storage/types").ListRunSummariesOptions): Promise<RunSummary[]> {
+      let results = sortRuns(await readRuns());
+      if (options?.statusFilter) {
+        results = results.filter((run) => run.status === options.statusFilter);
+      }
+      if (options?.cursor) {
+        const idx = results.findIndex((run) => run.id === options.cursor);
+        if (idx !== -1) {
+          results = results.slice(idx + 1);
+        }
+      }
+      if (options?.limit != null && options.limit > 0) {
+        results = results.slice(0, options.limit);
+      }
+      return results.map(buildRunSummary);
     },
     async getRun(runId: string): Promise<RunRecord | undefined> {
       const runs = await readRuns();
@@ -432,7 +449,10 @@ function createJsonStoreBackend(): QaStoreBackend {
       });
     },
     async createRun(plan: RunPlan): Promise<RunRecord> {
-      const parsed = parsePlainTextSteps(plan.stepsText);
+      const parsed = await parseStepsWithLlm(
+        plan.stepsText,
+        `${plan.featureArea} | ${plan.objective} | ${plan.targetUrl}`
+      );
       const scenarioLibraries = await readScenarioLibraries();
       const selectedLibrary = plan.scenarioLibraryId
         ? scenarioLibraries.find((library) => library.id === plan.scenarioLibraryId)
@@ -443,7 +463,7 @@ function createJsonStoreBackend(): QaStoreBackend {
             coverageGaps: selectedLibrary.coverageGaps,
             riskSummary: selectedLibrary.riskSummary
           }
-        : generateScenarios(plan);
+        : await generateScenariosWithLlm(plan);
       const now = new Date().toISOString();
       const runRecord: RunRecord = sanitizeRunRecordContent({
         id: createId("run"),
@@ -505,6 +525,82 @@ function createJsonStoreBackend(): QaStoreBackend {
         );
       }
       return savedRecord;
+    },
+    async deleteRun(id: string): Promise<void> {
+      const runs = await readRuns();
+      await writeRuns(runs.filter((run) => run.id !== id));
+    },
+    async deleteCredentialLibrary(id: string): Promise<void> {
+      const runs = await readRuns();
+      const blocked = runs.some((run) => run.plan.credentialLibraryId === id && (run.status === "queued" || run.status === "running"));
+      if (blocked) {
+        throw new Error("CREDENTIAL_IN_USE");
+      }
+      const libraries = await readStoredCredentialLibraries();
+      await writeStoredCredentialLibraries(libraries.filter((library) => library.id !== id));
+    },
+    async deleteEnvironmentLibrary(id: string): Promise<void> {
+      const runs = await readRuns();
+      const blocked = runs.some((run) => run.plan.environmentLibraryId === id && (run.status === "queued" || run.status === "running"));
+      if (blocked) {
+        throw new Error("ENVIRONMENT_IN_USE");
+      }
+      const libraries = await readEnvironmentLibraries();
+      await writeEnvironmentLibraries(libraries.filter((library) => library.id !== id));
+    },
+    async duplicateScenarioLibrary(id: string, newName: string): Promise<ScenarioLibrary> {
+      const libraries = await readScenarioLibraries();
+      const source = libraries.find((l) => l.id === id);
+      if (!source) {
+        throw new Error("NOT_FOUND");
+      }
+      const now = new Date().toISOString();
+      const newScenarios = source.scenarios.map((s) => ({ ...s, id: createId("scenario") }));
+      const newLibrary = normalizeScenarioLibraryRecord({
+        ...source,
+        id: createId("scenario_library"),
+        name: newName,
+        status: "active" as const,
+        sourceRunId: undefined,
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
+        versions: [],
+        scenarios: newScenarios
+      });
+      await writeScenarioLibraries([...libraries, newLibrary]);
+      return newLibrary;
+    },
+    async archiveScenarioLibrary(id: string): Promise<ScenarioLibrary> {
+      const libraries = await readScenarioLibraries();
+      const idx = libraries.findIndex((l) => l.id === id);
+      if (idx === -1) {
+        throw new Error("NOT_FOUND");
+      }
+      const updated = { ...libraries[idx], status: "archived" as const, updatedAt: new Date().toISOString() };
+      libraries[idx] = updated;
+      await writeScenarioLibraries(libraries);
+      return updated;
+    },
+    async renameScenarioLibrary(id: string, name: string): Promise<ScenarioLibrary> {
+      const libraries = await readScenarioLibraries();
+      const idx = libraries.findIndex((l) => l.id === id);
+      if (idx === -1) {
+        throw new Error("NOT_FOUND");
+      }
+      const updated = { ...libraries[idx], name, updatedAt: new Date().toISOString() };
+      libraries[idx] = updated;
+      await writeScenarioLibraries(libraries);
+      return updated;
+    },
+    async deleteScenarioLibrary(id: string): Promise<void> {
+      const runs = await readRuns();
+      const blocked = runs.some((run) => run.plan.scenarioLibraryId === id && (run.status === "queued" || run.status === "running"));
+      if (blocked) {
+        throw new Error("SCENARIO_LIBRARY_IN_USE");
+      }
+      const libraries = await readScenarioLibraries();
+      await writeScenarioLibraries(libraries.filter((library) => library.id !== id));
     }
   };
 }

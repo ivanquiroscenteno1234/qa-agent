@@ -1,5 +1,12 @@
 import type { RunRecord, RunStatus, RunSummary } from "@/lib/types";
 
+export interface RunProvenanceSummary {
+  stepParsing: "llm" | "heuristic" | "unknown";
+  scenarioGeneration: "llm" | "deterministic" | "unknown";
+  reviewAnalysis: "llm" | "heuristic" | "unknown";
+  hasLlmAssistance: boolean;
+}
+
 export interface MonitorSummaryViewModel {
   activeRuns: number;
   queuedRuns: number;
@@ -126,4 +133,17 @@ export function buildReviewComparison(selectedRun: RunRecord | null, runs: RunSu
         ? `${formatDelta(comparisonDelta.stepDelta)} vs baseline ${previousComparableRun.counts.stepResults}`
         : "Recorded review timeline entries"
   };
+}
+
+export function buildRunProvenanceSummary(run: RunRecord): RunProvenanceSummary {
+  const meta = run.llmMetadata;
+
+  if (!meta) {
+    return { stepParsing: "unknown", scenarioGeneration: "unknown", reviewAnalysis: "unknown", hasLlmAssistance: false };
+  }
+
+  const hasLlmAssistance =
+    meta.stepParsing === "llm" || meta.scenarioGeneration === "llm" || meta.reviewAnalysis === "llm";
+
+  return { ...meta, hasLlmAssistance };
 }

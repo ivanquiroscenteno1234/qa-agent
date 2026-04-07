@@ -6,6 +6,7 @@ interface ScenarioLibraryFilterBarProps {
   author: string;
   featureAreaOptions: string[];
   riskOptions: string[];
+  authorOptions: string[];
   onFeatureAreaChange: (value: string) => void;
   onRiskProfileChange: (value: string) => void;
   onAuthorChange: (value: string) => void;
@@ -17,6 +18,7 @@ export function ScenarioLibraryFilterBar({
   author,
   featureAreaOptions,
   riskOptions,
+  authorOptions,
   onFeatureAreaChange,
   onRiskProfileChange,
   onAuthorChange
@@ -47,8 +49,13 @@ export function ScenarioLibraryFilterBar({
       </label>
       <label>
         <span className="filter-select-label">Author</span>
-        <select value={author} onChange={(event) => onAuthorChange(event.target.value)} disabled>
-          <option value="future">Author metadata pending</option>
+        <select value={author} onChange={(event) => onAuthorChange(event.target.value)}>
+          <option value="all">All authors</option>
+          {authorOptions.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
         </select>
       </label>
     </FilterBar>

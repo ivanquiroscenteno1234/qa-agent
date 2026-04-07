@@ -21,7 +21,7 @@ import {
   runStep as runStepRuntime
 } from "@/lib/qa/browser-runtime";
 import { executeDiscoveryRun as runDiscoveryFlow } from "@/lib/qa/discovery-engine";
-import { buildDefects, buildStepResult, buildTerminalRunRecord, createSyntheticStepResult } from "@/lib/qa/result-builder";
+import { buildDefects, buildStepResult, buildTerminalRunRecord, computeInsightComparison, createSyntheticStepResult } from "@/lib/qa/result-builder";
 import {
   emitEvent,
   emitWarning,
@@ -32,7 +32,7 @@ import {
 import { executeScenarioSuiteRun as runScenarioSuiteFlow } from "@/lib/qa/scenario-executor";
 import { generateScenarios } from "@/lib/qa/scenario-generator";
 import { cleanLabel, expandedTerms, normalizeText, selectDiscoveryLabels, toRegex } from "@/lib/qa/text-runtime";
-import { updateRunState } from "@/lib/qa/store";
+import { getScenarioLibrary, updateRunState } from "@/lib/qa/store";
 import type { Artifact, DefectCandidate, ParsedStep, RunPlan, RunRecord, StepResult, StepStatus } from "@/lib/types";
 
 function resolveBrowser(browserName: string) {
@@ -191,7 +191,24 @@ export async function executeRun(record: RunRecord): Promise<RunRecord> {
     }
 
     if (record.plan.mode === "regression-run" && record.generatedScenarios.length > 0) {
-      return await executeScenarioSuiteRun(record, context, page);
+      const completedRecord = await executeScenarioSuiteRun(record, context, page);
+      // Attach insight comparison if a linked library baseline is available
+      if (record.plan.scenarioLibraryId) {
+        try {
+          const library = await getScenarioLibrary(record.plan.scenarioLibraryId);
+          const latestVersion = library?.versions?.at(-1);
+          if (latestVersion?.baselineInsights?.length) {
+            const comparison = computeInsightComparison(
+              completedRecord.analysisInsights,
+              latestVersion.baselineInsights
+            );
+            return { ...completedRecord, insightComparison: comparison };
+          }
+        } catch {
+          // Non-fatal: if baseline lookup fails, return the record without comparison
+        }
+      }
+      return completedRecord;
     }
 
     for (const [index, step] of record.parsedSteps.entries()) {

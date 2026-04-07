@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { formatZodError } from "@/lib/qa/plan-validation";
-import { getStoredCredentialLibrary, upsertCredentialLibrary } from "@/lib/qa/store";
+import { deleteCredentialLibrary, getStoredCredentialLibrary, upsertCredentialLibrary } from "@/lib/qa/store";
 
 const credentialLibraryInputSchema = z.object({
   label: z.string().trim().min(1),
@@ -51,4 +51,30 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   return NextResponse.json({ credentialLibrary: await upsertCredentialLibrary(parsed.data, credentialLibraryId) });
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const { credentialLibraryId } = await context.params;
+  const existing = await getStoredCredentialLibrary(credentialLibraryId);
+
+  if (!existing) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "The selected credential profile was not found." } },
+      { status: 404 }
+    );
+  }
+
+  try {
+    await deleteCredentialLibrary(credentialLibraryId);
+  } catch (error) {
+    if (error instanceof Error && error.message === "CREDENTIAL_IN_USE") {
+      return NextResponse.json(
+        { error: { code: "CREDENTIAL_IN_USE", message: "This credential profile is referenced by a run that is currently queued or running." } },
+        { status: 409 }
+      );
+    }
+    throw error;
+  }
+
+  return new NextResponse(null, { status: 204 });
 }

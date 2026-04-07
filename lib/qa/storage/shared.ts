@@ -1,4 +1,5 @@
 import type {
+  AnalysisInsight,
   CredentialLibraryInput,
   CredentialLibraryRecord,
   EnvironmentLibraryInput,
@@ -310,7 +311,9 @@ export function buildScenarioLibraryRecord(
   generated: GenerateScenariosResponse,
   now: string,
   sourceRunId?: string,
-  libraryName?: string
+  libraryName?: string,
+  libraryAuthor?: string,
+  sourceRunInsights?: AnalysisInsight[]
 ): ScenarioLibrary {
   const nextVersion = existing ? (hasScenarioLibraryChanges(existing, generated) ? existing.version + 1 : existing.version) : 1;
   const nextVersions = existing
@@ -318,13 +321,15 @@ export function buildScenarioLibraryRecord(
       ? existing.versions
       : [
           ...existing.versions,
-          createScenarioLibraryVersion(nextVersion, existing.scenarios, generated.scenarios, now, sourceRunId ?? existing.sourceRunId)
+          createScenarioLibraryVersion(nextVersion, existing.scenarios, generated.scenarios, now, sourceRunId ?? existing.sourceRunId, sourceRunInsights)
         ]
-    : [createInitialScenarioLibraryVersion(generated.scenarios, now, sourceRunId)];
+    : [createInitialScenarioLibraryVersion(generated.scenarios, now, sourceRunId, sourceRunInsights)];
 
   return {
     id: existing?.id ?? createId("scenario_library"),
     name: libraryName?.trim() || existing?.name || createScenarioLibraryName(plan),
+    author: libraryAuthor ?? existing?.author ?? "",
+    status: existing?.status ?? "active",
     sourceRunId: sourceRunId ?? existing?.sourceRunId,
     featureArea: plan.featureArea,
     environment: plan.environment,

@@ -1,13 +1,15 @@
 import type { BrowserContext, Locator, Page } from "playwright";
 
+import { buildQaInsights } from "@/lib/qa/analysis-engine";
+import { runLlmReviewAnalysis } from "@/lib/qa/llm/review-analysis";
 import { buildAnalysisReport, buildManualTestPlan, buildRunArtifacts, captureScreenshot } from "@/lib/qa/artifact-builder";
 import { hasCredentialSource, type AuthStateOutcome } from "@/lib/qa/auth-session";
 import type { CrawlSnapshot, CrawlView } from "@/lib/qa/crawl-model";
+import { buildPageSurface } from "@/lib/qa/crawl-model";
 import { discoverNavigationCandidates } from "@/lib/qa/navigation-discovery";
-import { generateScenarios } from "@/lib/qa/scenario-generator";
+import { buildTerminalRunRecord } from "@/lib/qa/result-builder";
+import { generateScenariosWithLlm } from "@/lib/qa/scenario-generator";
 import type {
-  AnalysisEvidenceReference,
-  AnalysisInsight,
   DefectCandidate,
   ParsedStep,
   RunPlan,
@@ -241,141 +243,6 @@ function buildDiscoveryDefects(
   return defects;
 }
 
-function buildAnalysisInsights(
-  crawlSnapshot: CrawlSnapshot | null,
-  discoverySurface: string[],
-  defects: DefectCandidate[],
-  plan: RunPlan
-): AnalysisInsight[] {
-  if (!crawlSnapshot) {
-    return [];
-  }
-
-  const insights: AnalysisInsight[] = [];
-  const combinedText = `${discoverySurface.join(" ")} ${(crawlSnapshot.buttons ?? []).join(" ")}`;
-  const hasSpanish = /men[uú]|configuraci[oó]n|art[ií]culos|gesti[oó]n|anal[ií]tica/i.test(combinedText);
-  const hasEnglish = /bundle|combo|menu|edit|pause|settings|panel/i.test(combinedText);
-  const visitedViews = crawlSnapshot.visitedViews ?? [];
-  const surfacedLabels = discoverySurface.slice(0, 4);
-  const placeholderOnlyDefect = defects.find((defect) => /placeholder text only/i.test(defect.title));
-  const indistinctNavigationDefect = defects.find((defect) => /may not expose distinct content/i.test(defect.title));
-  const unlabeledInput = visitedViews.flatMap((view) => view.inputs ?? []).find((input) => input.placeholder || input.ariaLabel || input.type || input.tag);
-
-  const evidenceFrom = (...items: Array<AnalysisEvidenceReference | null | undefined>): AnalysisEvidenceReference[] =>
-    items.filter((item): item is AnalysisEvidenceReference => Boolean(item));
-
-  if (discoverySurface.some((item) => /men[uú]|gesti[oó]n de men[uú]|art[ií]culos del men[uú]/i.test(item))) {
-    insights.push({
-      id: createId("analysis"),
-      category: "intended-flow",
-      title: "Likely intended pass flow: menu management",
-      summary: "The discovered navigation suggests restaurant partners are expected to reach menu management, review categories, and manage menu items successfully.",
-      recommendation: "Ensure menu views, category editing, item creation, and save feedback remain visible and distinct for operators.",
-      confidence: 0.83,
-      evidence: evidenceFrom(
-        { type: "surface", label: surfacedLabels.find((item) => /men[uú]|gesti[oó]n de men[uú]|art[ií]culos del men[uú]/i.test(item)) ?? "Menu-related surface discovered" },
-        visitedViews.find((view) => /men[uú]/i.test(view.label)) ? { type: "view", label: visitedViews.find((view) => /men[uú]/i.test(view.label))?.label ?? "Menú" } : null,
-        { type: "artifact", label: "Page Crawl" }
-      )
-    });
-  }
-
-  if (discoverySurface.some((item) => /combos|promos|bundle/i.test(item))) {
-    insights.push({
-      id: createId("analysis"),
-      category: "intended-flow",
-      title: "Likely intended pass flow: combos and promotions",
-      summary: "The product appears to support combo and promotion management as a first-class restaurant workflow.",
-      recommendation: "The dev team should verify that list, create, edit, pause, and resume states for combos all produce clear, distinct UI transitions.",
-      confidence: 0.79,
-      evidence: evidenceFrom(
-        { type: "surface", label: surfacedLabels.find((item) => /combos|promos|bundle/i.test(item)) ?? "Combos or promos surface discovered" },
-        visitedViews.find((view) => /combos|promos|bundle/i.test(view.label)) ? { type: "view", label: visitedViews.find((view) => /combos|promos|bundle/i.test(view.label))?.label ?? "Combos & promos" } : null,
-        { type: "artifact", label: "Page Crawl" }
-      )
-    });
-  }
-
-  if (hasSpanish && hasEnglish) {
-    insights.push({
-      id: createId("analysis"),
-      category: "usability",
-      title: "Mixed-language labeling may confuse operators",
-      summary: "The reachable UI mixes Spanish and English labels, increasing cognitive load during navigation and support workflows.",
-      recommendation: "Standardize the locale strategy so headings, actions, and navigation labels remain consistent for a given user session.",
-      confidence: 0.76,
-      evidence: evidenceFrom(
-        surfacedLabels[0] ? { type: "surface", label: surfacedLabels[0] } : null,
-        surfacedLabels[1] ? { type: "surface", label: surfacedLabels[1] } : null,
-        { type: "artifact", label: "Page Crawl" }
-      )
-    });
-  }
-
-  if ((crawlSnapshot.visitedViews ?? []).some((view) => view.headings.length === 0)) {
-    insights.push({
-      id: createId("analysis"),
-      category: "information-architecture",
-      title: "Some views lack clear heading-level orientation",
-      summary: "Several discovered views expose navigation and controls but no visible heading, making it harder for users to confirm where they are.",
-      recommendation: "Add stable page or section headings to each major workspace so users can orient themselves after navigation.",
-      confidence: 0.74,
-      evidence: evidenceFrom(
-        ...visitedViews
-          .filter((view) => view.headings.length === 0)
-          .slice(0, 3)
-          .map((view) => ({ type: "view" as const, label: view.label })),
-        { type: "artifact", label: "Page Crawl" }
-      )
-    });
-  }
-
-  if (placeholderOnlyDefect) {
-    insights.push({
-      id: createId("analysis"),
-      category: "accessibility",
-      title: "Form controls need explicit accessible labels",
-      summary: "At least one discovered input relies on placeholder text rather than a stable accessible label or input name.",
-      recommendation: "Add visible labels or accessible name attributes so assistive technologies and automation can identify control purpose reliably.",
-      confidence: 0.86,
-      evidence: evidenceFrom(
-        unlabeledInput ? { type: "input", label: unlabeledInput.placeholder || unlabeledInput.ariaLabel || unlabeledInput.type || unlabeledInput.tag } : null,
-        { type: "defect", label: placeholderOnlyDefect.title },
-        { type: "artifact", label: "Page Crawl" }
-      )
-    });
-  }
-
-  if (indistinctNavigationDefect) {
-    insights.push({
-      id: createId("analysis"),
-      category: "qa-recommendation",
-      title: "Some navigation targets may feel unresponsive to users",
-      summary: "The discovery run found views whose visible surface was indistinguishable from landing, which can look like broken or ineffective navigation.",
-      recommendation: "Add clearer view-specific content, empty states, or transition cues so users can tell the navigation action succeeded.",
-      confidence: 0.72,
-      evidence: evidenceFrom(
-        { type: "defect", label: indistinctNavigationDefect.title },
-        { type: "artifact", label: "Page Crawl" }
-      )
-    });
-  }
-
-  if (!insights.length) {
-    insights.push({
-      id: createId("analysis"),
-      category: "qa-recommendation",
-      title: `${plan.featureArea} produced no high-confidence UX recommendation`,
-      summary: "The bounded QA analysis did not find a strong product recommendation from the current crawl alone.",
-      recommendation: "Capture a deeper crawl or allow targeted interactive probes for the highest-risk user journeys.",
-      confidence: 0.55,
-      evidence: [{ type: "artifact", label: "Page Crawl" }]
-    });
-  }
-
-  return insights;
-}
-
 export async function executeDiscoveryRun(
   record: RunRecord,
   context: BrowserContext,
@@ -487,10 +354,30 @@ export async function executeDiscoveryRun(
 
     crawlContent = await collectDeepDiscoveryCrawl(page, record.plan, deps);
     const crawlSnapshot = parseCrawlSnapshot(crawlContent);
+    const pageSurface = crawlSnapshot ? buildPageSurface(crawlSnapshot) : undefined;
     const discoverySurface = summarizeDiscovery(crawlSnapshot, deps);
-    const scenarioSet = generateScenarios(record.plan, { crawlContent });
+    const scenarioSet = await generateScenariosWithLlm(record.plan, { crawlContent });
     const discoveryDefects = buildDiscoveryDefects(crawlSnapshot, record.plan, deps);
-    const analysisInsights = buildAnalysisInsights(crawlSnapshot, discoverySurface, discoveryDefects, record.plan);
+    const heuristicInsights = buildQaInsights({
+      stepResults,
+      artifacts: screenshotArtifacts,
+      warnings: [],
+      crawlSurface: pageSurface,
+      crawlSnapshot: crawlSnapshot ?? undefined,
+      defects: discoveryDefects,
+      discoverySurface,
+      plan: record.plan
+    });
+    const heuristicInsightsAnnotated = heuristicInsights.map((i) => ({ ...i, analysisSource: "heuristic" as const }));
+    const llmInsights = await runLlmReviewAnalysis({
+      featureArea: record.plan.featureArea,
+      mode: record.plan.mode,
+      stepResults,
+      warnings: [],
+      artifacts: screenshotArtifacts,
+      discoverySurface
+    });
+    const analysisInsights = [...heuristicInsightsAnnotated, ...llmInsights];
     const crawlStepNumber = stepResults.length + 1;
 
     const crawlScreenshotArtifact = await captureScreenshot(page, record.id, crawlStepNumber, `Discovery Step ${crawlStepNumber}`);
@@ -544,45 +431,39 @@ export async function executeDiscoveryRun(
       }))
     ];
 
-    return {
-      ...record,
-      updatedAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-      status: "pass",
-      currentPhase: "reporting",
-      currentActivity: "Discovery reporting completed.",
-      currentStepNumber: undefined,
-      currentScenarioIndex: undefined,
-      currentScenarioTitle: undefined,
-      summary: "The exploratory discovery run crawled the reachable UI and proposed manual tests based on the observed surface.",
-      generatedScenarios: scenarioSet.scenarios,
-      riskSummary: scenarioSet.riskSummary,
-      coverageGaps: scenarioSet.coverageGaps,
-      stepResults,
-      artifacts,
-      defects: discoveryDefects,
-      analysisInsights
-    };
+    return buildTerminalRunRecord(
+      {
+        ...record,
+        generatedScenarios: scenarioSet.scenarios,
+        riskSummary: scenarioSet.riskSummary,
+        coverageGaps: scenarioSet.coverageGaps,
+        pageSurfaceSnapshot: pageSurface
+      },
+      {
+        status: "pass",
+        currentPhase: "reporting",
+        currentActivity: "Discovery reporting completed.",
+        summary: "The exploratory discovery run crawled the reachable UI and proposed manual tests based on the observed surface.",
+        stepResults,
+        artifacts,
+        defects: discoveryDefects,
+        analysisInsights
+      }
+    );
   } catch (error) {
     const isCancellation = error instanceof Error && error.name === "RunCancelledError";
 
     if (isCancellation) {
-      return {
-        ...record,
-        updatedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
+      return buildTerminalRunRecord(record, {
         status: "cancelled",
         currentPhase: "cancelled",
         currentActivity: "Run cancelled during exploratory discovery.",
-        currentStepNumber: undefined,
-        currentScenarioIndex: undefined,
-        currentScenarioTitle: undefined,
         summary: "The exploratory discovery run was cancelled before completion.",
         stepResults,
         artifacts: screenshotArtifacts,
         defects: [],
         analysisInsights: []
-      };
+      });
     }
 
     const screenshotLabel = `Discovery Step ${stepResults.length + 1}`;
@@ -607,20 +488,15 @@ export async function executeDiscoveryRun(
       ...(await buildRunArtifacts(record.id, record.plan, context, page, { crawlContent }))
     ];
 
-    return {
-      ...record,
-      updatedAt: new Date().toISOString(),
+    return buildTerminalRunRecord(record, {
       status: "fail",
       currentPhase: "reporting",
       currentActivity: "Discovery reporting failed unexpectedly.",
-      currentStepNumber: undefined,
-      currentScenarioIndex: undefined,
-      currentScenarioTitle: undefined,
       summary: "The exploratory discovery run failed before it could complete the crawl.",
       stepResults,
       artifacts,
       defects: [],
       analysisInsights: []
-    };
+    });
   }
 }

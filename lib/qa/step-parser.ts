@@ -1,4 +1,5 @@
 import type { ActionType, ParseStepsResponse, ParsedStep, RiskLevel } from "@/lib/types";
+import { normalizeParsedSteps } from "@/lib/qa/llm/step-normalization";
 import { createId, splitSteps } from "@/lib/qa/utils";
 
 function normalizeTargetText(value: string): string {
@@ -134,4 +135,17 @@ export function parsePlainTextSteps(stepsText: string): ParseStepsResponse {
     assumptions,
     ambiguities
   };
+}
+
+/**
+ * Async variant: runs the heuristic parser then optionally passes the result
+ * through the LLM step normalization module (gated by QA_LLM_STEP_PARSING).
+ * The API route and any server-side caller that wants LLM assistance should
+ * use this function. Execution-critical paths that need synchronous parsing
+ * can continue using parsePlainTextSteps directly.
+ */
+export async function parseStepsWithLlm(stepsText: string, context?: string): Promise<ParseStepsResponse> {
+  const base = parsePlainTextSteps(stepsText);
+  const normalized = await normalizeParsedSteps(base.parsedSteps, context);
+  return { ...base, parsedSteps: normalized };
 }

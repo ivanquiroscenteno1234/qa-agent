@@ -37,6 +37,7 @@ interface DraftWorkflowViewProps {
   environmentLibraryName: string;
   credentialLibraryName: string;
   scenarioLibraryName: string;
+  scenarioLibraryAuthor: string;
   planWarnings: string[];
   feedback: string;
   isPending: boolean;
@@ -46,6 +47,7 @@ interface DraftWorkflowViewProps {
   onEnvironmentLibraryNameChange: (value: string) => void;
   onCredentialLibraryNameChange: (value: string) => void;
   onScenarioLibraryNameChange: (value: string) => void;
+  onScenarioLibraryAuthorChange: (value: string) => void;
   onSelectEnvironmentLibrary: (environmentLibraryId: string) => void;
   onSelectCredentialLibrary: (credentialLibraryId: string) => void;
   onSelectScenarioLibrary: (scenarioLibraryId: string) => void;
@@ -80,6 +82,7 @@ export function DraftWorkflowView({
   environmentLibraryName,
   credentialLibraryName,
   scenarioLibraryName,
+  scenarioLibraryAuthor,
   planWarnings,
   feedback,
   isPending,
@@ -89,6 +92,7 @@ export function DraftWorkflowView({
   onEnvironmentLibraryNameChange,
   onCredentialLibraryNameChange,
   onScenarioLibraryNameChange,
+  onScenarioLibraryAuthorChange,
   onSelectEnvironmentLibrary,
   onSelectCredentialLibrary,
   onSelectScenarioLibrary,
@@ -170,6 +174,14 @@ export function DraftWorkflowView({
     <section className="draft-screen">
       <div className="draft-primary-column">
         <SectionFrame eyebrow="01 // Environment & Target" title="Mission Parameters" reference={missionReference}>
+          {selectedEnvironmentLibrary ? (
+            <div className="draft-profile-banner">
+              <span className="muted">Loaded from profile: <strong>{selectedEnvironmentLibrary.name}</strong></span>
+              <button type="button" className="draft-profile-clear" onClick={() => onSelectEnvironmentLibrary("")}>
+                Clear Profile
+              </button>
+            </div>
+          ) : null}
           <div className="field-grid two-up">
             <label>
               {renderLabel("Environment")}
@@ -489,6 +501,14 @@ export function DraftWorkflowView({
             <label>
               {renderLabel("Library Name")}
               <input value={scenarioLibraryName} onChange={(event) => onScenarioLibraryNameChange(event.target.value)} />
+            </label>
+            <label>
+              {renderLabel("Author")}
+              <input
+                value={scenarioLibraryAuthor}
+                onChange={(event) => onScenarioLibraryAuthorChange(event.target.value)}
+                placeholder="Optional author name"
+              />
             </label>
           </div>
 

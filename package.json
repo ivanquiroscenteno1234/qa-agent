@@ -10,9 +10,13 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "sqlite:rebuild": "node scripts/rebuild-sqlite-store.mjs",
-    "verify:credential-secrets": "node scripts/verify-credential-secrets.mjs"
+    "verify:credential-secrets": "node scripts/verify-credential-secrets.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.8.0",
     "next": "15.5.14",
@@ -26,8 +30,10 @@
     "@types/node": "22.15.17",
     "@types/react": "19.1.2",
     "@types/react-dom": "19.1.2",
+    "@vitest/coverage-v8": "^4.1.2",
     "eslint": "9.25.1",
     "eslint-config-next": "15.5.14",
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "vitest": "^4.1.2"
   }
 }

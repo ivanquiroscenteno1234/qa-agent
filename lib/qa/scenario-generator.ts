@@ -1,4 +1,5 @@
 import type { GenerateScenariosResponse, RunPlan, Scenario, ScenarioType } from "@/lib/types";
+import { generateLlmScenarios } from "@/lib/qa/llm/scenario-generation";
 import { parsePlainTextSteps } from "@/lib/qa/step-parser";
 import { createId, titleCase } from "@/lib/qa/utils";
 
@@ -325,5 +326,44 @@ export function generateScenarios(plan: RunPlan, options?: { crawlContent?: stri
     scenarios,
     coverageGaps,
     riskSummary
+  };
+}
+
+/**
+ * Async variant: runs the deterministic generator first, then merges in
+ * Gemini-generated scenarios when QA_LLM_SCENARIO_GENERATION is enabled.
+ * Deterministic scenarios are annotated generationSource: "deterministic".
+ */
+export async function generateScenariosWithLlm(
+  plan: RunPlan,
+  options?: { crawlContent?: string }
+): Promise<GenerateScenariosResponse> {
+  const base = generateScenarios(plan, options);
+  const deterministicScenarios: Scenario[] = base.scenarios.map((s) => ({
+    ...s,
+    generationSource: "deterministic" as const
+  }));
+
+  const crawlSnapshot = parseCrawlSnapshot(options?.crawlContent);
+  const discoverySurface = getDiscoverySurface(crawlSnapshot);
+  const parsed = parsePlainTextSteps(plan.stepsText);
+  const parsedStepSummary = parsed.parsedSteps
+    .slice(0, 6)
+    .map((s, i) => `${i + 1}. [${s.actionType}] ${s.targetDescription}`)
+    .join("; ");
+
+  const llmScenarios = await generateLlmScenarios({
+    featureArea: plan.featureArea || "Feature under test",
+    role: plan.role || "operator",
+    objective: plan.objective || `Validate ${plan.featureArea}`,
+    targetUrl: plan.targetUrl,
+    parsedStepSummary,
+    discoverySurface,
+    riskLevel: plan.riskLevel
+  });
+
+  return {
+    ...base,
+    scenarios: [...deterministicScenarios, ...llmScenarios]
   };
 }

@@ -21,10 +21,8 @@ export function hasCredentialSource(plan: RunPlan): boolean {
 }
 
 export async function resolveCredentials(plan: RunPlan, parsedSteps: ParsedStep[]): Promise<{ email: string; password: string }> {
-  if (plan.loginEmail && plan.loginPassword) {
-    return { email: plan.loginEmail, password: plan.loginPassword };
-  }
-
+  // Prefer stored credential profile when one is linked — inline fields may
+  // have been stripped from the persisted plan (Gap 9.1).
   if ((plan.credentialLibraryId ?? "").trim()) {
     const credential = await getStoredCredentialLibrary(plan.credentialLibraryId ?? "");
 
@@ -44,6 +42,10 @@ export async function resolveCredentials(plan: RunPlan, parsedSteps: ParsedStep[
     if (credential.secretMode === "reference-only") {
       throw new Error(`Saved credential ${credential.label} is reference-only and cannot be used for automatic login yet.`);
     }
+  }
+
+  if (plan.loginEmail && plan.loginPassword) {
+    return { email: plan.loginEmail, password: plan.loginPassword };
   }
 
   const loginStep = parsedSteps.find((step) => step.actionType === "login");
