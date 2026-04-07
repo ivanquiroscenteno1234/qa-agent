@@ -18,6 +18,8 @@ export function WorkflowBar({
       <div className="workflow-tabs" role="tablist" aria-label="Operator workflow">
         <button
           type="button"
+          role="tab"
+          aria-selected={workflowView === "draft"}
           className={`workflow-tab ${workflowView === "draft" ? "workflow-tab-active" : ""}`}
           onClick={() => onChangeView("draft")}
         >
@@ -25,6 +27,8 @@ export function WorkflowBar({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={workflowView === "monitor"}
           className={`workflow-tab ${workflowView === "monitor" ? "workflow-tab-active" : ""}`}
           onClick={() => onChangeView("monitor")}
         >
@@ -32,6 +36,8 @@ export function WorkflowBar({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={workflowView === "review"}
           className={`workflow-tab ${workflowView === "review" ? "workflow-tab-active" : ""}`}
           onClick={() => onChangeView("review")}
         >
