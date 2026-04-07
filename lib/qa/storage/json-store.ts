@@ -432,7 +432,7 @@ function createJsonStoreBackend(): QaStoreBackend {
       });
     },
     async createRun(plan: RunPlan): Promise<RunRecord> {
-      const parsed = parsePlainTextSteps(plan.stepsText);
+      const parsed = await parsePlainTextSteps(plan.stepsText);
       const scenarioLibraries = await readScenarioLibraries();
       const selectedLibrary = plan.scenarioLibraryId
         ? scenarioLibraries.find((library) => library.id === plan.scenarioLibraryId)
@@ -443,7 +443,7 @@ function createJsonStoreBackend(): QaStoreBackend {
             coverageGaps: selectedLibrary.coverageGaps,
             riskSummary: selectedLibrary.riskSummary
           }
-        : generateScenarios(plan);
+        : await generateScenarios(plan);
       const now = new Date().toISOString();
       const runRecord: RunRecord = sanitizeRunRecordContent({
         id: createId("run"),

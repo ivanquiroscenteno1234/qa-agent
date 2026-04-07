@@ -9,5 +9,5 @@ const requestSchema = z.object({
 
 export async function POST(request: Request) {
   const payload = requestSchema.parse(await request.json());
-  return NextResponse.json(parsePlainTextSteps(payload.stepsText));
+  return NextResponse.json(await parsePlainTextSteps(payload.stepsText));
 }

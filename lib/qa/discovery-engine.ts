@@ -488,7 +488,7 @@ export async function executeDiscoveryRun(
     crawlContent = await collectDeepDiscoveryCrawl(page, record.plan, deps);
     const crawlSnapshot = parseCrawlSnapshot(crawlContent);
     const discoverySurface = summarizeDiscovery(crawlSnapshot, deps);
-    const scenarioSet = generateScenarios(record.plan, { crawlContent });
+    const scenarioSet = await generateScenarios(record.plan, { crawlContent });
     const discoveryDefects = buildDiscoveryDefects(crawlSnapshot, record.plan, deps);
     const analysisInsights = buildAnalysisInsights(crawlSnapshot, discoverySurface, discoveryDefects, record.plan);
     const crawlStepNumber = stepResults.length + 1;

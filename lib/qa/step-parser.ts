@@ -1,5 +1,9 @@
+import { SchemaType } from "@google/generative-ai";
+
 import type { ActionType, ParseStepsResponse, ParsedStep, RiskLevel } from "@/lib/types";
 import { createId, splitSteps } from "@/lib/qa/utils";
+import { generateStructuredContent } from "@/lib/qa/llm/client";
+import { getQaLlmConfig } from "@/lib/qa/llm/config";
 
 function normalizeTargetText(value: string): string {
   return value.trim().replace(/[.,;:!?]+$/, "");
@@ -92,7 +96,58 @@ function inferExpectedResult(actionType: ActionType, line: string): string {
   return line;
 }
 
-export function parsePlainTextSteps(stepsText: string): ParseStepsResponse {
+export async function parsePlainTextSteps(stepsText: string): Promise<ParseStepsResponse> {
+  const config = getQaLlmConfig();
+
+  if (config.enabled && config.features.stepParsing) {
+    const response = await generateStructuredContent<ParseStepsResponse>(
+      `Parse the following plain text testing steps into structured actionable steps:\n\n${stepsText}`,
+      {
+        type: SchemaType.OBJECT,
+        properties: {
+          parsedSteps: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                rawText: { type: SchemaType.STRING, description: "The original line of text from the steps." },
+                actionType: { type: SchemaType.STRING, description: "The inferred action type: navigate, login, open-navigation, open-section, assert-editable, fill, click, assert-visible, assert-url, or observe" },
+                targetDescription: { type: SchemaType.STRING, description: "The inferred target element, text, or url" },
+                inputData: { type: SchemaType.STRING, description: "Any data to input if the action is fill/login" },
+                expectedResult: { type: SchemaType.STRING, description: "The expected result of the step." },
+                fallbackInterpretation: { type: SchemaType.STRING, description: "A safe fallback description for standard observation." },
+                riskClassification: { type: SchemaType.STRING, description: "low, moderate, or high risk" },
+              },
+              required: ["rawText", "actionType", "targetDescription", "expectedResult", "fallbackInterpretation", "riskClassification"]
+            }
+          },
+          assumptions: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING }
+          },
+          ambiguities: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING }
+          }
+        },
+        required: ["parsedSteps", "assumptions", "ambiguities"]
+      },
+      "You are a QA automation expert. Parse natural language test steps into structured steps. Determine the most accurate 'actionType' from the user's intent. If there's an ambiguity or missing detail, document it in 'ambiguities' or 'assumptions'."
+    );
+
+    if (response) {
+      return {
+        parsedSteps: response.parsedSteps.map(step => ({
+          ...step,
+          id: createId("step"),
+        })) as ParsedStep[],
+        assumptions: response.assumptions || [],
+        ambiguities: response.ambiguities || []
+      };
+    }
+  }
+
+  // Deterministic fallback
   const lines = splitSteps(stepsText);
 
   const parsedSteps: ParsedStep[] = lines.map((line) => {
