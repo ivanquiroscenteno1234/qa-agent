@@ -53,6 +53,9 @@ import { needsCredentialSecretProtection, protectCredentialSecret } from "@/lib/
 import type { QaStoreBackend, RunRecordPatch } from "@/lib/qa/storage/types";
 import { createId } from "@/lib/qa/utils";
 
+let cachedRuns: RunRecord[] | null = null;
+let runMutationLock = Promise.resolve();
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -178,11 +181,17 @@ export function readSeedDataFromJsonStoreSync(): {
 
 function createJsonStoreBackend(): QaStoreBackend {
   async function readRuns(): Promise<RunRecord[]> {
+    if (cachedRuns) {
+      return [...cachedRuns];
+    }
+
     const content = await readJsonFileWithRetry<RunRecord[]>(runStorePath, []);
-    return content.map(normalizeRunRecord);
+    cachedRuns = content.map(normalizeRunRecord);
+    return [...cachedRuns];
   }
 
   async function writeRuns(runs: RunRecord[]): Promise<void> {
+    cachedRuns = runs;
     await ensureStore();
     await writeJsonAtomic(runStorePath, JSON.stringify(runs, null, 2));
   }
@@ -234,18 +243,23 @@ function createJsonStoreBackend(): QaStoreBackend {
   }
 
   async function mutateRun(runId: string, mutate: (run: RunRecord) => RunRecord): Promise<RunRecord | undefined> {
-    const runs = await readRuns();
-    const index = runs.findIndex((run) => run.id === runId);
+    const next = runMutationLock.then(async () => {
+      const runs = await readRuns();
+      const index = runs.findIndex((run) => run.id === runId);
 
-    if (index === -1) {
-      return undefined;
-    }
+      if (index === -1) {
+        return undefined;
+      }
 
-    const nextRun = sanitizeRunRecordContent(normalizeRunRecord(mutate(runs[index])));
-    const nextRuns = [...runs];
-    nextRuns[index] = nextRun;
-    await writeRuns(nextRuns);
-    return nextRun;
+      const nextRun = sanitizeRunRecordContent(normalizeRunRecord(mutate(runs[index])));
+      const nextRuns = [...runs];
+      nextRuns[index] = nextRun;
+      await writeRuns(nextRuns);
+      return nextRun;
+    });
+
+    runMutationLock = next.then(() => {}).catch(() => {});
+    return next;
   }
 
   return {
@@ -493,10 +507,16 @@ function createJsonStoreBackend(): QaStoreBackend {
         ],
         warnings: []
       });
-      const runs = await readRuns();
-      runs.push(runRecord);
-      await writeRuns(runs);
-      return runRecord;
+
+      const next = runMutationLock.then(async () => {
+        const runs = await readRuns();
+        runs.push(runRecord);
+        await writeRuns(runs);
+        return runRecord;
+      });
+
+      runMutationLock = next.then(() => {}).catch(() => {});
+      return next;
     },
     async saveRun(record: RunRecord): Promise<RunRecord> {
       const scenarioLibraries = record.plan.scenarioLibraryId ? await readScenarioLibraries() : [];
@@ -506,29 +526,40 @@ function createJsonStoreBackend(): QaStoreBackend {
       const nextRecord = existingLibrary
         ? { ...record, scenarioLibraryComparison: buildScenarioLibraryComparison(existingLibrary, record.generatedScenarios) }
         : record;
-      const runs = await readRuns();
-      const nextRuns = runs.map((existing) =>
-        existing.id === nextRecord.id ? sanitizeRunRecordContent(mergeRunRecord(existing, nextRecord)) : existing
-      );
-      await writeRuns(nextRuns);
-      const savedRecord = nextRuns.find((existing) => existing.id === nextRecord.id) ?? sanitizeRunRecordContent(normalizeRunRecord(nextRecord));
-      if (savedRecord.generatedScenarios.length && savedRecord.plan.scenarioLibraryId && savedRecord.plan.mode !== "regression-run") {
-        await this.upsertScenarioLibraryFromRun(
-          savedRecord.plan,
-          {
-            scenarios: savedRecord.generatedScenarios,
-            coverageGaps: savedRecord.coverageGaps,
-            riskSummary: savedRecord.riskSummary
-          },
-          savedRecord.id,
-          savedRecord.plan.scenarioLibraryId
+
+      const next = runMutationLock.then(async () => {
+        const runs = await readRuns();
+        const nextRuns = runs.map((existing) =>
+          existing.id === nextRecord.id ? sanitizeRunRecordContent(mergeRunRecord(existing, nextRecord)) : existing
         );
-      }
-      return savedRecord;
+        await writeRuns(nextRuns);
+        const savedRecord = nextRuns.find((existing) => existing.id === nextRecord.id) ?? sanitizeRunRecordContent(normalizeRunRecord(nextRecord));
+        if (savedRecord.generatedScenarios.length && savedRecord.plan.scenarioLibraryId && savedRecord.plan.mode !== "regression-run") {
+          await this.upsertScenarioLibraryFromRun(
+            savedRecord.plan,
+            {
+              scenarios: savedRecord.generatedScenarios,
+              coverageGaps: savedRecord.coverageGaps,
+              riskSummary: savedRecord.riskSummary
+            },
+            savedRecord.id,
+            savedRecord.plan.scenarioLibraryId
+          );
+        }
+        return savedRecord;
+      });
+
+      runMutationLock = next.then(() => {}).catch(() => {});
+      return next;
     },
     async deleteRun(id: string): Promise<void> {
-      const runs = await readRuns();
-      await writeRuns(runs.filter((run) => run.id !== id));
+      const next = runMutationLock.then(async () => {
+        const runs = await readRuns();
+        await writeRuns(runs.filter((run) => run.id !== id));
+      });
+
+      runMutationLock = next.then(() => {}).catch(() => {});
+      return next;
     },
     async deleteCredentialLibrary(id: string): Promise<void> {
       const runs = await readRuns();
