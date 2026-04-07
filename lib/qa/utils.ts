@@ -1,5 +1,5 @@
 export function createId(prefix: string): string {
-  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+  return `${prefix}_${crypto.randomUUID().replace(/-/g, "").slice(0, 10)}`;
 }
 
 export function splitSteps(stepsText: string): string[] {
