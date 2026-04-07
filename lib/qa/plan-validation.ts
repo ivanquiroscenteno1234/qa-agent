@@ -42,8 +42,14 @@ export interface ApiErrorShape {
   details?: string[];
 }
 
-function isLocalTarget(targetUrl: string): boolean {
-  return /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(targetUrl);
+export function isLocalTarget(targetUrl: string): boolean {
+  const localPattern = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/i;
+  try {
+    const parsed = new URL(targetUrl);
+    return localPattern.test(parsed.hostname);
+  } catch {
+    return localPattern.test(targetUrl);
+  }
 }
 
 export function isValidTargetUrl(targetUrl: string): boolean {
@@ -55,7 +61,7 @@ export function isValidTargetUrl(targetUrl: string): boolean {
   }
 }
 
-function isProductionLikeEnvironment(environment: string, targetUrl: string): boolean {
+export function isProductionLikeEnvironment(environment: string, targetUrl: string): boolean {
   return /prod/i.test(environment) || !isLocalTarget(targetUrl);
 }
 
