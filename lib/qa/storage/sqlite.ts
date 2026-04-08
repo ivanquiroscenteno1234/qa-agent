@@ -623,78 +623,97 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
   db.prepare("DELETE FROM step_results WHERE run_id = ?").run(run.id);
   db.prepare("DELETE FROM run_artifacts WHERE run_id = ?").run(run.id);
 
-  const insertEvent = db.prepare(
-    `INSERT INTO run_events (
-      id,
-      run_id,
-      timestamp,
-      phase,
-      level,
-      message,
-      category,
-      step_number,
-      scenario_title
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  );
-  const insertStepResult = db.prepare(
-    `INSERT INTO step_results (
-      step_id,
-      run_id,
-      step_number,
-      user_step_text,
-      normalized_action,
-      observed_target,
-      action_result,
-      assertion_result,
-      notes,
-      screenshot_label,
-      screenshot_artifact_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  );
-  const insertArtifact = db.prepare(
-    `INSERT INTO run_artifacts (
-      id,
-      run_id,
-      ordinal,
-      type,
-      label,
-      content
-    ) VALUES (?, ?, ?, ?, ?, ?)`
-  );
-
-  for (const event of run.events) {
-    insertEvent.run(
-      event.id,
-      run.id,
-      event.timestamp,
-      event.phase,
-      event.level,
-      event.message,
-      event.category ?? null,
-      event.stepNumber ?? null,
-      event.scenarioTitle ?? null
-    );
+  if (run.events.length > 0) {
+    const chunkSize = 100;
+    const cache = new Map<number, Database.Statement>();
+    for (let i = 0; i < run.events.length; i += chunkSize) {
+      const chunk = run.events.slice(i, i + chunkSize);
+      let stmt = cache.get(chunk.length);
+      if (!stmt) {
+        const placeholders = Array.from({ length: chunk.length }, () => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+        stmt = db.prepare(
+          `INSERT INTO run_events (
+            id, run_id, timestamp, phase, level, message, category, step_number, scenario_title
+          ) VALUES ${placeholders}`
+        );
+        cache.set(chunk.length, stmt);
+      }
+      stmt.run(
+        ...chunk.flatMap((event) => [
+          event.id,
+          run.id,
+          event.timestamp,
+          event.phase,
+          event.level,
+          event.message,
+          event.category ?? null,
+          event.stepNumber ?? null,
+          event.scenarioTitle ?? null
+        ])
+      );
+    }
   }
 
-  for (const stepResult of run.stepResults) {
-    insertStepResult.run(
-      stepResult.stepId,
-      run.id,
-      stepResult.stepNumber,
-      stepResult.userStepText,
-      stepResult.normalizedAction,
-      stepResult.observedTarget,
-      stepResult.actionResult,
-      stepResult.assertionResult,
-      stepResult.notes,
-      stepResult.screenshotLabel,
-      stepResult.screenshotArtifactId ?? null
-    );
+  if (run.stepResults.length > 0) {
+    const chunkSize = 100;
+    const cache = new Map<number, Database.Statement>();
+    for (let i = 0; i < run.stepResults.length; i += chunkSize) {
+      const chunk = run.stepResults.slice(i, i + chunkSize);
+      let stmt = cache.get(chunk.length);
+      if (!stmt) {
+        const placeholders = Array.from({ length: chunk.length }, () => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+        stmt = db.prepare(
+          `INSERT INTO step_results (
+            step_id, run_id, step_number, user_step_text, normalized_action, observed_target, action_result, assertion_result, notes, screenshot_label, screenshot_artifact_id
+          ) VALUES ${placeholders}`
+        );
+        cache.set(chunk.length, stmt);
+      }
+      stmt.run(
+        ...chunk.flatMap((stepResult) => [
+          stepResult.stepId,
+          run.id,
+          stepResult.stepNumber,
+          stepResult.userStepText,
+          stepResult.normalizedAction,
+          stepResult.observedTarget,
+          stepResult.actionResult,
+          stepResult.assertionResult,
+          stepResult.notes,
+          stepResult.screenshotLabel,
+          stepResult.screenshotArtifactId ?? null
+        ])
+      );
+    }
   }
 
-  run.artifacts.forEach((artifact, index) => {
-    insertArtifact.run(artifact.id, run.id, index, artifact.type, artifact.label, artifact.content);
-  });
+  if (run.artifacts.length > 0) {
+    const chunkSize = 100;
+    const cache = new Map<number, Database.Statement>();
+    for (let i = 0; i < run.artifacts.length; i += chunkSize) {
+      const chunk = run.artifacts.slice(i, i + chunkSize);
+      let stmt = cache.get(chunk.length);
+      if (!stmt) {
+        const placeholders = Array.from({ length: chunk.length }, () => "(?, ?, ?, ?, ?, ?)").join(", ");
+        stmt = db.prepare(
+          `INSERT INTO run_artifacts (
+            id, run_id, ordinal, type, label, content
+          ) VALUES ${placeholders}`
+        );
+        cache.set(chunk.length, stmt);
+      }
+      stmt.run(
+        ...chunk.flatMap((artifact, chunkIdx) => [
+          artifact.id,
+          run.id,
+          i + chunkIdx,
+          artifact.type,
+          artifact.label,
+          artifact.content
+        ])
+      );
+    }
+  }
 }
 
 function writeRunRecord(db: Database.Database, run: RunRecord): RunRecord {
