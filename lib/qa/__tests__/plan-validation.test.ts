@@ -29,6 +29,24 @@ describe("isValidTargetUrl", () => {
     expect(isValidTargetUrl("/api/test")).toBe(false);
     expect(isValidTargetUrl("./relative")).toBe(false);
   });
+
+  it("returns false for empty or whitespace strings", () => {
+    expect(isValidTargetUrl("")).toBe(false);
+    expect(isValidTargetUrl("   ")).toBe(false);
+  });
+
+  it("handles URLs with surrounding whitespace", () => {
+    expect(isValidTargetUrl("  https://example.com  ")).toBe(true);
+  });
+
+  it("returns true for URLs with IPv4 and IPv6 addresses", () => {
+    expect(isValidTargetUrl("http://192.168.1.1")).toBe(true);
+    expect(isValidTargetUrl("https://[::1]")).toBe(true);
+  });
+
+  it("returns true for URLs with credentials", () => {
+    expect(isValidTargetUrl("https://user:pass@example.com")).toBe(true);
+  });
 });
 
 describe("isLocalTarget", () => {
