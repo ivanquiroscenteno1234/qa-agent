@@ -527,8 +527,22 @@ function hydrateScenarioLibrary(db: Database.Database, row: ScenarioLibraryRow |
   });
 }
 
-function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
-  db.prepare(
+function writeNormalizedRunTables(
+  db: Database.Database,
+  run: RunRecord,
+  statements?: {
+    insertRun: Database.Statement;
+    insertRunDetails: Database.Statement;
+    insertRunMetrics: Database.Statement;
+    deleteRunEvents: Database.Statement;
+    deleteStepResults: Database.Statement;
+    deleteRunArtifacts: Database.Statement;
+    insertEvent: Database.Statement;
+    insertStepResult: Database.Statement;
+    insertArtifact: Database.Statement;
+  }
+): void {
+  const insertRun = statements?.insertRun ?? db.prepare(
     `INSERT INTO runs (id, created_at, updated_at, status, payload)
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
@@ -536,9 +550,10 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
       updated_at = excluded.updated_at,
       status = excluded.status,
       payload = excluded.payload`
-  ).run(run.id, run.createdAt, run.updatedAt, run.status, JSON.stringify(run));
+  );
+  insertRun.run(run.id, run.createdAt, run.updatedAt, run.status, JSON.stringify(run));
 
-  db.prepare(
+  const insertRunDetails = statements?.insertRunDetails ?? db.prepare(
     `INSERT INTO run_details (
       run_id,
       started_at,
@@ -575,7 +590,8 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
         browser = excluded.browser,
       role = excluded.role,
       scenario_library_id = excluded.scenario_library_id`
-  ).run(
+  );
+  insertRunDetails.run(
     run.id,
     run.startedAt ?? null,
     run.completedAt ?? null,
@@ -595,7 +611,7 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
     run.plan.scenarioLibraryId ?? null
   );
 
-  db.prepare(
+  const insertRunMetrics = statements?.insertRunMetrics ?? db.prepare(
     `INSERT INTO run_metrics (
       run_id,
       parsed_step_count,
@@ -610,7 +626,8 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
       step_result_count = excluded.step_result_count,
       artifact_count = excluded.artifact_count,
       defect_count = excluded.defect_count`
-  ).run(
+  );
+  insertRunMetrics.run(
     run.id,
     run.parsedSteps.length,
     run.generatedScenarios.length,
@@ -619,11 +636,16 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
     run.defects.length
   );
 
-  db.prepare("DELETE FROM run_events WHERE run_id = ?").run(run.id);
-  db.prepare("DELETE FROM step_results WHERE run_id = ?").run(run.id);
-  db.prepare("DELETE FROM run_artifacts WHERE run_id = ?").run(run.id);
+  const deleteRunEvents = statements?.deleteRunEvents ?? db.prepare("DELETE FROM run_events WHERE run_id = ?");
+  deleteRunEvents.run(run.id);
 
-  const insertEvent = db.prepare(
+  const deleteStepResults = statements?.deleteStepResults ?? db.prepare("DELETE FROM step_results WHERE run_id = ?");
+  deleteStepResults.run(run.id);
+
+  const deleteRunArtifacts = statements?.deleteRunArtifacts ?? db.prepare("DELETE FROM run_artifacts WHERE run_id = ?");
+  deleteRunArtifacts.run(run.id);
+
+  const insertEvent = statements?.insertEvent ?? db.prepare(
     `INSERT INTO run_events (
       id,
       run_id,
@@ -636,7 +658,7 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
       scenario_title
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
-  const insertStepResult = db.prepare(
+  const insertStepResult = statements?.insertStepResult ?? db.prepare(
     `INSERT INTO step_results (
       step_id,
       run_id,
@@ -651,7 +673,7 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
       screenshot_artifact_id
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
-  const insertArtifact = db.prepare(
+  const insertArtifact = statements?.insertArtifact ?? db.prepare(
     `INSERT INTO run_artifacts (
       id,
       run_id,
@@ -706,108 +728,128 @@ function writeRunRecord(db: Database.Database, run: RunRecord): RunRecord {
   return normalized;
 }
 
+function writeScenarioLibraryRecordInternal(
+  db: Database.Database,
+  nextLibrary: ScenarioLibrary,
+  statements?: {
+    insertScenarioLibrary: Database.Statement;
+    insertScenarioLibraryDetails: Database.Statement;
+    deleteScenarioLibraryVersions: Database.Statement;
+    deleteScenarioLibraryScenarios: Database.Statement;
+    insertVersion: Database.Statement;
+    insertScenario: Database.Statement;
+  }
+): void {
+  const insertScenarioLibrary = statements?.insertScenarioLibrary ?? db.prepare(
+    "INSERT INTO scenario_libraries (id, name, status, author, updated_at, payload) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, status = excluded.status, author = excluded.author, updated_at = excluded.updated_at, payload = excluded.payload"
+  );
+  insertScenarioLibrary.run(nextLibrary.id, nextLibrary.name, nextLibrary.status ?? "active", nextLibrary.author ?? "", nextLibrary.updatedAt, JSON.stringify(nextLibrary));
+
+  const insertScenarioLibraryDetails = statements?.insertScenarioLibraryDetails ?? db.prepare(
+    `INSERT INTO scenario_library_details (
+      library_id,
+      source_run_id,
+      feature_area,
+      environment,
+      target_url,
+      role,
+      created_at,
+      version,
+      risk_summary_json,
+      coverage_gaps_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(library_id) DO UPDATE SET
+      source_run_id = excluded.source_run_id,
+      feature_area = excluded.feature_area,
+      environment = excluded.environment,
+      target_url = excluded.target_url,
+      role = excluded.role,
+      created_at = excluded.created_at,
+      version = excluded.version,
+      risk_summary_json = excluded.risk_summary_json,
+      coverage_gaps_json = excluded.coverage_gaps_json`
+  );
+  insertScenarioLibraryDetails.run(
+    nextLibrary.id,
+    nextLibrary.sourceRunId ?? null,
+    nextLibrary.featureArea,
+    nextLibrary.environment,
+    nextLibrary.targetUrl,
+    nextLibrary.role,
+    nextLibrary.createdAt,
+    nextLibrary.version,
+    JSON.stringify(nextLibrary.riskSummary),
+    JSON.stringify(nextLibrary.coverageGaps)
+  );
+
+  const deleteScenarioLibraryVersions = statements?.deleteScenarioLibraryVersions ?? db.prepare("DELETE FROM scenario_library_versions WHERE library_id = ?");
+  deleteScenarioLibraryVersions.run(nextLibrary.id);
+
+  const deleteScenarioLibraryScenarios = statements?.deleteScenarioLibraryScenarios ?? db.prepare("DELETE FROM scenario_library_scenarios WHERE library_id = ?");
+  deleteScenarioLibraryScenarios.run(nextLibrary.id);
+
+  const insertVersion = statements?.insertVersion ?? db.prepare(
+    `INSERT INTO scenario_library_versions (
+      library_id,
+      version,
+      created_at,
+      source_run_id,
+      scenario_count,
+      summary,
+      change_summary_json,
+      baseline_insights_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const insertScenario = statements?.insertScenario ?? db.prepare(
+    `INSERT INTO scenario_library_scenarios (
+      scenario_id,
+      library_id,
+      ordinal,
+      title,
+      priority,
+      type,
+      prerequisites_json,
+      steps_json,
+      expected_result,
+      risk_rationale,
+      approved_for_automation
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+
+  for (const version of nextLibrary.versions) {
+    insertVersion.run(
+      nextLibrary.id,
+      version.version,
+      version.createdAt,
+      version.sourceRunId ?? null,
+      version.scenarioCount,
+      version.summary,
+      JSON.stringify(version.changeSummary),
+      JSON.stringify(version.baselineInsights ?? [])
+    );
+  }
+
+  nextLibrary.scenarios.forEach((scenario, index) => {
+    insertScenario.run(
+      scenario.id,
+      nextLibrary.id,
+      index,
+      scenario.title,
+      scenario.priority,
+      scenario.type,
+      JSON.stringify(scenario.prerequisites),
+      JSON.stringify(scenario.steps),
+      scenario.expectedResult,
+      scenario.riskRationale,
+      scenario.approvedForAutomation ? 1 : 0
+    );
+  });
+}
+
 function writeScenarioLibraryRecord(db: Database.Database, library: ScenarioLibrary): ScenarioLibrary {
   const normalized = normalizeScenarioLibraryRecord(library);
   const transaction = db.transaction((nextLibrary: ScenarioLibrary) => {
-    db.prepare(
-      "INSERT INTO scenario_libraries (id, name, status, author, updated_at, payload) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, status = excluded.status, author = excluded.author, updated_at = excluded.updated_at, payload = excluded.payload"
-    ).run(nextLibrary.id, nextLibrary.name, nextLibrary.status ?? "active", nextLibrary.author ?? "", nextLibrary.updatedAt, JSON.stringify(nextLibrary));
-
-    db.prepare(
-      `INSERT INTO scenario_library_details (
-        library_id,
-        source_run_id,
-        feature_area,
-        environment,
-        target_url,
-        role,
-        created_at,
-        version,
-        risk_summary_json,
-        coverage_gaps_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(library_id) DO UPDATE SET
-        source_run_id = excluded.source_run_id,
-        feature_area = excluded.feature_area,
-        environment = excluded.environment,
-        target_url = excluded.target_url,
-        role = excluded.role,
-        created_at = excluded.created_at,
-        version = excluded.version,
-        risk_summary_json = excluded.risk_summary_json,
-        coverage_gaps_json = excluded.coverage_gaps_json`
-    ).run(
-      nextLibrary.id,
-      nextLibrary.sourceRunId ?? null,
-      nextLibrary.featureArea,
-      nextLibrary.environment,
-      nextLibrary.targetUrl,
-      nextLibrary.role,
-      nextLibrary.createdAt,
-      nextLibrary.version,
-      JSON.stringify(nextLibrary.riskSummary),
-      JSON.stringify(nextLibrary.coverageGaps)
-    );
-
-    db.prepare("DELETE FROM scenario_library_versions WHERE library_id = ?").run(nextLibrary.id);
-    db.prepare("DELETE FROM scenario_library_scenarios WHERE library_id = ?").run(nextLibrary.id);
-
-    const insertVersion = db.prepare(
-      `INSERT INTO scenario_library_versions (
-        library_id,
-        version,
-        created_at,
-        source_run_id,
-        scenario_count,
-        summary,
-        change_summary_json,
-        baseline_insights_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    const insertScenario = db.prepare(
-      `INSERT INTO scenario_library_scenarios (
-        scenario_id,
-        library_id,
-        ordinal,
-        title,
-        priority,
-        type,
-        prerequisites_json,
-        steps_json,
-        expected_result,
-        risk_rationale,
-        approved_for_automation
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-
-    for (const version of nextLibrary.versions) {
-      insertVersion.run(
-        nextLibrary.id,
-        version.version,
-        version.createdAt,
-        version.sourceRunId ?? null,
-        version.scenarioCount,
-        version.summary,
-        JSON.stringify(version.changeSummary),
-        JSON.stringify(version.baselineInsights ?? [])
-      );
-    }
-
-    nextLibrary.scenarios.forEach((scenario, index) => {
-      insertScenario.run(
-        scenario.id,
-        nextLibrary.id,
-        index,
-        scenario.title,
-        scenario.priority,
-        scenario.type,
-        JSON.stringify(scenario.prerequisites),
-        JSON.stringify(scenario.steps),
-        scenario.expectedResult,
-        scenario.riskRationale,
-        scenario.approvedForAutomation ? 1 : 0
-      );
-    });
+    writeScenarioLibraryRecordInternal(db, nextLibrary);
   });
 
   transaction(normalized);
@@ -857,20 +899,200 @@ function openDatabase(): Database.Database {
     const seed = db.transaction(() => {
       const data = readSeedDataFromJsonStoreSync();
 
+      const runStatements = {
+        insertRun: db.prepare(
+          `INSERT INTO runs (id, created_at, updated_at, status, payload)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at,
+            status = excluded.status,
+            payload = excluded.payload`
+        ),
+        insertRunDetails: db.prepare(
+          `INSERT INTO run_details (
+            run_id,
+            started_at,
+            completed_at,
+            cancel_requested_at,
+            current_phase,
+            current_activity,
+            current_step_number,
+            current_scenario_index,
+            current_scenario_title,
+            summary,
+            feature_area,
+            environment,
+            target_url,
+            mode,
+            browser,
+            role,
+            scenario_library_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(run_id) DO UPDATE SET
+            started_at = excluded.started_at,
+            completed_at = excluded.completed_at,
+            cancel_requested_at = excluded.cancel_requested_at,
+            current_phase = excluded.current_phase,
+            current_activity = excluded.current_activity,
+            current_step_number = excluded.current_step_number,
+            current_scenario_index = excluded.current_scenario_index,
+            current_scenario_title = excluded.current_scenario_title,
+            summary = excluded.summary,
+            feature_area = excluded.feature_area,
+            environment = excluded.environment,
+            target_url = excluded.target_url,
+            mode = excluded.mode,
+              browser = excluded.browser,
+            role = excluded.role,
+            scenario_library_id = excluded.scenario_library_id`
+        ),
+        insertRunMetrics: db.prepare(
+          `INSERT INTO run_metrics (
+            run_id,
+            parsed_step_count,
+            generated_scenario_count,
+            step_result_count,
+            artifact_count,
+            defect_count
+          ) VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(run_id) DO UPDATE SET
+            parsed_step_count = excluded.parsed_step_count,
+            generated_scenario_count = excluded.generated_scenario_count,
+            step_result_count = excluded.step_result_count,
+            artifact_count = excluded.artifact_count,
+            defect_count = excluded.defect_count`
+        ),
+        deleteRunEvents: db.prepare("DELETE FROM run_events WHERE run_id = ?"),
+        deleteStepResults: db.prepare("DELETE FROM step_results WHERE run_id = ?"),
+        deleteRunArtifacts: db.prepare("DELETE FROM run_artifacts WHERE run_id = ?"),
+        insertEvent: db.prepare(
+          `INSERT INTO run_events (
+            id,
+            run_id,
+            timestamp,
+            phase,
+            level,
+            message,
+            category,
+            step_number,
+            scenario_title
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ),
+        insertStepResult: db.prepare(
+          `INSERT INTO step_results (
+            step_id,
+            run_id,
+            step_number,
+            user_step_text,
+            normalized_action,
+            observed_target,
+            action_result,
+            assertion_result,
+            notes,
+            screenshot_label,
+            screenshot_artifact_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ),
+        insertArtifact: db.prepare(
+          `INSERT INTO run_artifacts (
+            id,
+            run_id,
+            ordinal,
+            type,
+            label,
+            content
+          ) VALUES (?, ?, ?, ?, ?, ?)`
+        )
+      };
+
       for (const run of data.runs) {
-        writeRunRecord(db, run);
+        const normalized = sanitizeRunRecordContent(normalizeRunRecord(run));
+        writeNormalizedRunTables(db, normalized, runStatements);
       }
+
+      const libraryStatements = {
+        insertScenarioLibrary: db.prepare(
+          "INSERT INTO scenario_libraries (id, name, status, author, updated_at, payload) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, status = excluded.status, author = excluded.author, updated_at = excluded.updated_at, payload = excluded.payload"
+        ),
+        insertScenarioLibraryDetails: db.prepare(
+          `INSERT INTO scenario_library_details (
+            library_id,
+            source_run_id,
+            feature_area,
+            environment,
+            target_url,
+            role,
+            created_at,
+            version,
+            risk_summary_json,
+            coverage_gaps_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(library_id) DO UPDATE SET
+            source_run_id = excluded.source_run_id,
+            feature_area = excluded.feature_area,
+            environment = excluded.environment,
+            target_url = excluded.target_url,
+            role = excluded.role,
+            created_at = excluded.created_at,
+            version = excluded.version,
+            risk_summary_json = excluded.risk_summary_json,
+            coverage_gaps_json = excluded.coverage_gaps_json`
+        ),
+        deleteScenarioLibraryVersions: db.prepare("DELETE FROM scenario_library_versions WHERE library_id = ?"),
+        deleteScenarioLibraryScenarios: db.prepare("DELETE FROM scenario_library_scenarios WHERE library_id = ?"),
+        insertVersion: db.prepare(
+          `INSERT INTO scenario_library_versions (
+            library_id,
+            version,
+            created_at,
+            source_run_id,
+            scenario_count,
+            summary,
+            change_summary_json,
+            baseline_insights_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ),
+        insertScenario: db.prepare(
+          `INSERT INTO scenario_library_scenarios (
+            scenario_id,
+            library_id,
+            ordinal,
+            title,
+            priority,
+            type,
+            prerequisites_json,
+            steps_json,
+            expected_result,
+            risk_rationale,
+            approved_for_automation
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+      };
 
       for (const library of data.scenarioLibraries) {
-        writeScenarioLibraryRecord(db, library);
+        const normalized = normalizeScenarioLibraryRecord(library);
+        writeScenarioLibraryRecordInternal(db, normalized, libraryStatements);
       }
+
+      const envStatements = {
+        insertEnvironmentLibrary: db.prepare(
+          "INSERT INTO environment_libraries (id, name, updated_at, payload) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, payload = excluded.payload"
+        )
+      };
 
       for (const environmentLibrary of data.environmentLibraries) {
-        writeEnvironmentLibraryRecord(db, environmentLibrary);
+        writeEnvironmentLibraryRecordInternal(db, environmentLibrary, envStatements);
       }
 
+      const credStatements = {
+        insertCredentialLibrary: db.prepare(
+          "INSERT INTO credential_libraries (id, label, updated_at, payload) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET label = excluded.label, updated_at = excluded.updated_at, payload = excluded.payload"
+        )
+      };
+
       for (const credentialLibrary of data.credentialLibraries) {
-        writeStoredCredentialLibraryRecord(db, credentialLibrary);
+        writeStoredCredentialLibraryRecordInternal(db, credentialLibrary, credStatements);
       }
     });
 
@@ -897,19 +1119,39 @@ function parseCredentialLibraryRow(row: CredentialLibraryRow | undefined): Store
   return row ? normalizeStoredCredentialLibraryRecord(JSON.parse(row.payload) as StoredCredentialLibraryRecord) : undefined;
 }
 
+function writeEnvironmentLibraryRecordInternal(
+  db: Database.Database,
+  library: EnvironmentLibraryRecord,
+  statements?: { insertEnvironmentLibrary: Database.Statement }
+): void {
+  const normalized = normalizeEnvironmentLibraryRecord(library);
+  const insertEnvironmentLibrary = statements?.insertEnvironmentLibrary ?? db.prepare(
+    "INSERT INTO environment_libraries (id, name, updated_at, payload) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, payload = excluded.payload"
+  );
+  insertEnvironmentLibrary.run(normalized.id, normalized.name, normalized.updatedAt, JSON.stringify(normalized));
+}
+
 function writeEnvironmentLibraryRecord(db: Database.Database, library: EnvironmentLibraryRecord): EnvironmentLibraryRecord {
   const normalized = normalizeEnvironmentLibraryRecord(library);
-  db.prepare(
-    "INSERT INTO environment_libraries (id, name, updated_at, payload) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, payload = excluded.payload"
-  ).run(normalized.id, normalized.name, normalized.updatedAt, JSON.stringify(normalized));
+  writeEnvironmentLibraryRecordInternal(db, normalized);
   return normalized;
+}
+
+function writeStoredCredentialLibraryRecordInternal(
+  db: Database.Database,
+  library: StoredCredentialLibraryRecord,
+  statements?: { insertCredentialLibrary: Database.Statement }
+): void {
+  const normalized = normalizeStoredCredentialLibraryRecord(library);
+  const insertCredentialLibrary = statements?.insertCredentialLibrary ?? db.prepare(
+    "INSERT INTO credential_libraries (id, label, updated_at, payload) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET label = excluded.label, updated_at = excluded.updated_at, payload = excluded.payload"
+  );
+  insertCredentialLibrary.run(normalized.id, normalized.label, normalized.updatedAt, JSON.stringify(normalized));
 }
 
 function writeStoredCredentialLibraryRecord(db: Database.Database, library: StoredCredentialLibraryRecord): StoredCredentialLibraryRecord {
   const normalized = normalizeStoredCredentialLibraryRecord(library);
-  db.prepare(
-    "INSERT INTO credential_libraries (id, label, updated_at, payload) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET label = excluded.label, updated_at = excluded.updated_at, payload = excluded.payload"
-  ).run(normalized.id, normalized.label, normalized.updatedAt, JSON.stringify(normalized));
+  writeStoredCredentialLibraryRecordInternal(db, normalized);
   return normalized;
 }
 
