@@ -194,12 +194,19 @@ export function hasScenarioLibraryChanges(existing: ScenarioLibrary, generated: 
 }
 
 export function sanitizeLogMessage(value: string): string {
-  return value
+  let redacted = value
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED_EMAIL]")
     .replace(/password\s*[:=]?\s*[^\s]+/gi, "password [REDACTED]")
     .replace(/token\s*[:=]?\s*[^\s]+/gi, "token [REDACTED]")
     .replace(/apikey\s*[:=]?\s*[^\s]+/gi, "apikey [REDACTED]")
     .replace(/zxcvFDSAqwer1234@/g, "[REDACTED_SECRET]");
+
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  if (geminiKey) {
+    redacted = redacted.replaceAll(geminiKey, "[REDACTED]");
+  }
+
+  return redacted;
 }
 
 export function sanitizeOptionalText(value?: string): string | undefined {
