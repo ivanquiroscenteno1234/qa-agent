@@ -173,6 +173,10 @@ type RunSummaryRow = {
 
 let database: Database.Database | null = null;
 
+const runEventsStmtCache = new Map<number, Database.Statement>();
+const stepResultsStmtCache = new Map<number, Database.Statement>();
+const runArtifactsStmtCache = new Map<number, Database.Statement>();
+
 function readRunDetails(db: Database.Database, runId: string): RunDetailsRow | undefined {
   return db.prepare(
     `SELECT
@@ -625,10 +629,9 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
 
   if (run.events.length > 0) {
     const chunkSize = 100;
-    const cache = new Map<number, Database.Statement>();
     for (let i = 0; i < run.events.length; i += chunkSize) {
       const chunk = run.events.slice(i, i + chunkSize);
-      let stmt = cache.get(chunk.length);
+      let stmt = runEventsStmtCache.get(chunk.length);
       if (!stmt) {
         const placeholders = Array.from({ length: chunk.length }, () => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
         stmt = db.prepare(
@@ -636,7 +639,7 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
             id, run_id, timestamp, phase, level, message, category, step_number, scenario_title
           ) VALUES ${placeholders}`
         );
-        cache.set(chunk.length, stmt);
+        runEventsStmtCache.set(chunk.length, stmt);
       }
       stmt.run(
         ...chunk.flatMap((event) => [
@@ -656,10 +659,9 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
 
   if (run.stepResults.length > 0) {
     const chunkSize = 100;
-    const cache = new Map<number, Database.Statement>();
     for (let i = 0; i < run.stepResults.length; i += chunkSize) {
       const chunk = run.stepResults.slice(i, i + chunkSize);
-      let stmt = cache.get(chunk.length);
+      let stmt = stepResultsStmtCache.get(chunk.length);
       if (!stmt) {
         const placeholders = Array.from({ length: chunk.length }, () => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
         stmt = db.prepare(
@@ -667,7 +669,7 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
             step_id, run_id, step_number, user_step_text, normalized_action, observed_target, action_result, assertion_result, notes, screenshot_label, screenshot_artifact_id
           ) VALUES ${placeholders}`
         );
-        cache.set(chunk.length, stmt);
+        stepResultsStmtCache.set(chunk.length, stmt);
       }
       stmt.run(
         ...chunk.flatMap((stepResult) => [
@@ -689,10 +691,9 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
 
   if (run.artifacts.length > 0) {
     const chunkSize = 100;
-    const cache = new Map<number, Database.Statement>();
     for (let i = 0; i < run.artifacts.length; i += chunkSize) {
       const chunk = run.artifacts.slice(i, i + chunkSize);
-      let stmt = cache.get(chunk.length);
+      let stmt = runArtifactsStmtCache.get(chunk.length);
       if (!stmt) {
         const placeholders = Array.from({ length: chunk.length }, () => "(?, ?, ?, ?, ?, ?)").join(", ");
         stmt = db.prepare(
@@ -700,7 +701,7 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
             id, run_id, ordinal, type, label, content
           ) VALUES ${placeholders}`
         );
-        cache.set(chunk.length, stmt);
+        runArtifactsStmtCache.set(chunk.length, stmt);
       }
       stmt.run(
         ...chunk.flatMap((artifact, chunkIdx) => [
