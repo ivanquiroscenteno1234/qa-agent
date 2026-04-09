@@ -1,4 +1,1 @@
-## 2024-03-05 - Initial Observations
-## 2026-04-07 - Added missing ARIA attributes for tablist
-**Learning:** When using `role="tablist"` on a container, the child elements functioning as tabs need `role="tab"` and `aria-selected` attributes to communicate their state clearly to screen readers, improving keyboard and screen-reader accessibility.
-**Action:** Always ensure that structural ARIA roles like tablist have their correct complementary child roles (tab) and state attributes (aria-selected) when building custom tab navigation.
+## 2026-04-08 - Added Global Focus Visible Outline\n**Learning:** Interactive elements did not have basic focus styling, which makes keyboard navigation inaccessible. Modifying the global variables to include a generic ':focus-visible' is an easy win.\n**Action:** Verify there is no conflict with other utilities and confirm it applies to interactive elements.
