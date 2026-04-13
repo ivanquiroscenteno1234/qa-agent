@@ -202,8 +202,13 @@ export function sanitizeLogMessage(value: string): string {
     .replace(/zxcvFDSAqwer1234@/g, "[REDACTED_SECRET]");
 
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
-  if (geminiKey) {
+  if (geminiKey && geminiKey.length >= 8) {
     redacted = redacted.replaceAll(geminiKey, "[REDACTED]");
+  }
+
+  const qaSecretKey = process.env.QA_LOCAL_SECRET_KEY?.trim();
+  if (qaSecretKey && qaSecretKey.length >= 8) {
+    redacted = redacted.replaceAll(qaSecretKey, "[REDACTED]");
   }
 
   return redacted;
