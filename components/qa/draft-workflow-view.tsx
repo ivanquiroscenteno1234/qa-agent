@@ -334,13 +334,13 @@ export function DraftWorkflowView({
           </div>
 
           <ActionBar>
-            <button type="button" onClick={onParse} disabled={Boolean(parseDisabledReason)}>
+            <button type="button" onClick={onParse} disabled={Boolean(parseDisabledReason)} title={parseDisabledReason || undefined}>
               Parse Steps
             </button>
-            <button type="button" onClick={onGenerateScenarios} disabled={Boolean(generateScenariosDisabledReason)}>
+            <button type="button" onClick={onGenerateScenarios} disabled={Boolean(generateScenariosDisabledReason)} title={generateScenariosDisabledReason || undefined}>
               Generate Scenarios
             </button>
-            <button type="button" className="primary-action" onClick={onCreateRun} disabled={Boolean(createRunDisabledReason)}>
+            <button type="button" className="primary-action" onClick={onCreateRun} disabled={Boolean(createRunDisabledReason)} title={createRunDisabledReason || undefined}>
               Create Run
             </button>
           </ActionBar>
@@ -431,16 +431,16 @@ export function DraftWorkflowView({
           </div>
 
           <ActionBar>
-            <button type="button" onClick={onSaveEnvironmentLibrary} disabled={Boolean(saveEnvironmentDisabledReason)}>
+            <button type="button" onClick={onSaveEnvironmentLibrary} disabled={Boolean(saveEnvironmentDisabledReason)} title={saveEnvironmentDisabledReason || undefined}>
               Save Environment
             </button>
-            <button type="button" onClick={onUpdateEnvironmentLibrary} disabled={Boolean(updateEnvironmentDisabledReason)}>
+            <button type="button" onClick={onUpdateEnvironmentLibrary} disabled={Boolean(updateEnvironmentDisabledReason)} title={updateEnvironmentDisabledReason || undefined}>
               Update Environment
             </button>
-            <button type="button" onClick={onSaveCredentialLibrary} disabled={Boolean(saveCredentialDisabledReason)}>
+            <button type="button" onClick={onSaveCredentialLibrary} disabled={Boolean(saveCredentialDisabledReason)} title={saveCredentialDisabledReason || undefined}>
               Save Credential
             </button>
-            <button type="button" onClick={onUpdateCredentialLibrary} disabled={Boolean(updateCredentialDisabledReason)}>
+            <button type="button" onClick={onUpdateCredentialLibrary} disabled={Boolean(updateCredentialDisabledReason)} title={updateCredentialDisabledReason || undefined}>
               Update Credential
             </button>
           </ActionBar>
@@ -515,10 +515,10 @@ export function DraftWorkflowView({
           </div>
 
           <ActionBar>
-            <button type="button" onClick={onSaveAsLibrary} disabled={!hasScenarioSource || !scenarioLibraryName.trim()}>
+            <button type="button" onClick={onSaveAsLibrary} disabled={!hasScenarioSource || !scenarioLibraryName.trim()} title={saveAsDisabledReason || undefined}>
               Save As Library
             </button>
-            <button type="button" onClick={onUpdateLibrary} disabled={!selectedScenarioLibrary || !hasScenarioSource}>
+            <button type="button" onClick={onUpdateLibrary} disabled={!selectedScenarioLibrary || !hasScenarioSource} title={updateDisabledReason || undefined}>
               Update Library
             </button>
           </ActionBar>
