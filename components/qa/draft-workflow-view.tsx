@@ -177,7 +177,7 @@ export function DraftWorkflowView({
           {selectedEnvironmentLibrary ? (
             <div className="draft-profile-banner">
               <span className="muted">Loaded from profile: <strong>{selectedEnvironmentLibrary.name}</strong></span>
-              <button type="button" className="draft-profile-clear" onClick={() => onSelectEnvironmentLibrary("")}>
+              <button aria-label="Clear Environment Profile" type="button" className="draft-profile-clear" onClick={() => onSelectEnvironmentLibrary("")}>
                 Clear Profile
               </button>
             </div>

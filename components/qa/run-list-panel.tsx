@@ -39,6 +39,7 @@ export function RunListPanel({ runs, selectedRunId, emptyListMessage, onSelectRu
 
           return (
             <button
+              aria-label={`View run details for ${item.featureArea} (${item.status})`}
               key={item.id}
               type="button"
               className={`monitor-run-card ${selectedRunId === item.id ? "monitor-run-card-active" : ""}`}
