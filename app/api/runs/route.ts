@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 
 import { formatZodError, runPlanSchema, validateRunPlanForMode } from "@/lib/qa/plan-validation";
 import { createRun, listRuns } from "@/lib/qa/store";
+import { protectCredentialSecret } from "@/lib/qa/credential-secret";
+import { sanitizeRunRecord } from "@/lib/qa/storage/shared";
 
 export async function GET() {
-  return NextResponse.json({ runs: await listRuns() });
+  const runs = await listRuns();
+  return NextResponse.json({ runs: runs.map(sanitizeRunRecord) });
 }
 
 export async function POST(request: Request) {
@@ -23,9 +26,11 @@ export async function POST(request: Request) {
   const plan = parsed.data;
   // Security: strip inline credentials from the persisted plan when a saved
   // credential profile is selected — the library record holds the secret.
-  const sanitizedPlan = plan.credentialLibraryId
+  // Otherwise, ensure the inline password is encrypted before storage.
+  const persistedPlan = plan.credentialLibraryId
     ? { ...plan, loginEmail: "", loginPassword: "" }
-    : plan;
+    : { ...plan, loginPassword: protectCredentialSecret(plan.loginPassword) ?? "" };
 
-  return NextResponse.json({ run: await createRun(sanitizedPlan) }, { status: 201 });
+  const run = await createRun(persistedPlan);
+  return NextResponse.json({ run: sanitizeRunRecord(run) }, { status: 201 });
 }
