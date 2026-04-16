@@ -55,6 +55,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 a {
   color: inherit;
 }
@@ -951,11 +956,6 @@ a {
   justify-content: flex-end;
 }
 
-.scenario-library-card-actions button:disabled {
-  cursor: not-allowed;
-  opacity: 0.72;
-}
-
 .scenario-library-divider {
   height: 1px;
   background: rgba(175, 179, 176, 0.18);
@@ -1072,11 +1072,6 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.settings-card-actions button:disabled {
-  cursor: not-allowed;
-  opacity: 0.72;
 }
 
 .shell {

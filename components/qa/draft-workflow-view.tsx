@@ -177,7 +177,7 @@ export function DraftWorkflowView({
           {selectedEnvironmentLibrary ? (
             <div className="draft-profile-banner">
               <span className="muted">Loaded from profile: <strong>{selectedEnvironmentLibrary.name}</strong></span>
-              <button type="button" className="draft-profile-clear" onClick={() => onSelectEnvironmentLibrary("")}>
+              <button aria-label="Clear Environment Profile" type="button" className="draft-profile-clear" onClick={() => onSelectEnvironmentLibrary("")}>
                 Clear Profile
               </button>
             </div>
@@ -226,6 +226,7 @@ export function DraftWorkflowView({
                 type="button"
                 className={`toggle ${plan.headless ? "" : "toggle-active"}`}
                 onClick={() => onPlanChange("headless", !plan.headless)}
+                aria-pressed={!plan.headless}
               >
                 {plan.headless ? "Headless" : "Visible Browser"}
               </button>
@@ -266,6 +267,7 @@ export function DraftWorkflowView({
                 type="button"
                 className={`toggle ${plan.safeMode ? "toggle-active" : ""}`}
                 onClick={() => onPlanChange("safeMode", !plan.safeMode)}
+                aria-pressed={plan.safeMode}
               >
                 {plan.safeMode ? "Observe-only" : "Interactive"}
               </button>

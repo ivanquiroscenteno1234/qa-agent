@@ -1,0 +1,3 @@
+## 2024-05-24 - Disabled Buttons Lack Context & Uniformity
+**Learning:** Inaccessible disabled buttons cause friction in the workflow builder (e.g. users didn't know why 'Parse Steps' or 'Save Environment' were disabled). Additionally, hardcoded global specific classes vs HTML `button:disabled` pseudo-class led to inconsistent visual states.
+**Action:** Relied on a single native `:disabled` pseudo-class across `app/globals.css` with native attributes like `cursor: not-allowed;` and enforced `title` props on explicitly disabled action buttons in Draft workflow, reusing `disabledReason` strings.

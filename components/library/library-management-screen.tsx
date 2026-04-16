@@ -255,10 +255,10 @@ export function LibraryManagementScreen({ storeBackendLabel = "json" }: LibraryM
         description="Curated repository of reusable mission templates and verified execution logic. This first pass focuses on browse, filter, and readiness signals before in-place mutation workflows are added."
         actions={
           <ActionBar>
-            <button type="button" disabled>
+            <button type="button" disabled title="Importing a scenario library from JSON is not yet implemented.">
               Import JSON
             </button>
-            <button type="button" disabled>
+            <button type="button" disabled title="Bulk archiving scenario libraries is not yet implemented.">
               Bulk Archive
             </button>
           </ActionBar>
