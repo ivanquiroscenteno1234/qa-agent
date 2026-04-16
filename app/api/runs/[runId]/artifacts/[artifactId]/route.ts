@@ -46,8 +46,18 @@ export async function GET(_request: Request, context: { params: Promise<{ runId:
     });
   }
 
-  const fileBuffer = await readFile(artifact.content);
-  const extension = path.extname(artifact.content).toLowerCase();
+  const artifactDirectory = path.join(process.cwd(), ".data", "artifacts");
+  const absolutePath = path.resolve(artifact.content);
+
+  // 🛡️ Sentinel: Prevent Path Traversal attacks by verifying the resolved
+  // absolute path falls strictly within the designated artifact directory.
+  // Using path.sep prevents prefix bypasses (e.g. `.data/artifacts_secret`).
+  if (!absolutePath.startsWith(artifactDirectory + path.sep)) {
+    return NextResponse.json({ error: "Forbidden: Invalid artifact path" }, { status: 403 });
+  }
+
+  const fileBuffer = await readFile(absolutePath);
+  const extension = path.extname(absolutePath).toLowerCase();
   const contentType =
     extension === ".png"
       ? "image/png"
