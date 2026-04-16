@@ -69,10 +69,11 @@ export function CredentialVaultCard({ credential }: CredentialVaultCardProps) {
       {deleteError && <p className="muted" style={{ color: "var(--color-danger, #c0392b)" }}>{deleteError}</p>}
 
       <div className="settings-card-actions">
-        <button type="button" disabled title="Rotation is not implemented in the current local-file architecture.">
+        <button aria-label="Rotate credential profile" type="button" disabled title="Rotation is not implemented in the current local-file architecture.">
           Rotate
         </button>
         <button
+          aria-label="Delete credential profile"
           type="button"
           disabled={isInlineEntry || isDeleting}
           title={isInlineEntry ? "Inline entry rows cannot be deleted — they are generated from run history." : undefined}
