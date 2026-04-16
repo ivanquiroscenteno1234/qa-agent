@@ -1,6 +1,6 @@
-# Bolt Persona: Performance Optimization Learnings
-
-## 2024-03-XX: SQLite Insert Batching Optimization
-- **Problem:** Loop iterations calling `insert.run()` (e.g. for `run_events`, `step_results`, `run_artifacts`) exhibit the N+1 anti-pattern, repeatedly crossing the Node.js / C++ boundary even inside a transaction.
-- **Solution:** Utilize chunked batching with multi-row `VALUES (?, ?), (?, ?)` inserts.
-- **Learning:** `better-sqlite3` is highly optimized for prepared statement loops inside a transaction, so raw wall-clock time reduction might appear small on local NVMe storage. However, batching reduces the number of SQLite VM operations and the boundary crossings by a factor of the chunk size (e.g., 100x), significantly reducing CPU overhead per insert, memory churn, and potential transaction lock duration under load.
+## 2024-04-10
+**Task:** Optimize N+1 Query in Run Seeding Loop in SQLite
+**Learnings:**
+- To optimize bulk inserts in better-sqlite3 within this project, use chunked multi-row batching (e.g., `VALUES (?, ?), (?, ?)`) to reduce Node.js/C++ boundary crossings and SQLite VM operations.
+- Ensure the Map caching these dynamically generated prepared statements is placed in module scope (not inside the function) to properly reuse compiled statements across calls and avoid performance degradation.
+- When replacing single-record insertions that use `DELETE FROM` to clean up child associations, remember to retain idempotency by performing chunked batched `DELETE` statements based on the chunk's IDs before inserting the child records.
