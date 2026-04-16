@@ -77,7 +77,7 @@ export async function SettingsScreen({ storeBackendLabel = "json" }: SettingsScr
             <Link className="side-nav-primary-action" href="/library">
               Review Libraries
             </Link>
-            <button type="button" disabled>
+            <button type="button" disabled title="Exporting settings is not yet implemented.">
               Export Settings
             </button>
           </ActionBar>
