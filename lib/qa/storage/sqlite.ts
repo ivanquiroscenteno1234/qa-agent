@@ -464,46 +464,112 @@ function listRunSummariesFromSql(db: Database.Database): RunSummary[] {
   return rows.map(mapRunSummaryRow);
 }
 
-function hydrateRunRecord(db: Database.Database, row: RunRow | undefined): RunRecord | undefined {
-  const base = parseRunRow(row);
+// ⚡ Bolt: Batch fetch related entities using WHERE IN (?, ...) to prevent O(N) N+1 query bottlenecks during list operations
+function hydrateRunRecords(db: Database.Database, rows: RunRow[]): RunRecord[] {
+  const bases = rows.map(parseRunRow).filter((r): r is RunRecord => Boolean(r));
+  if (bases.length === 0) return [];
 
-  if (!base) {
-    return undefined;
+  const detailsMap = new Map<string, RunDetailsRow>();
+  const metricsMap = new Map<string, RunMetricsRow>();
+  const eventsMap = new Map<string, RunEvent[]>();
+  const stepResultsMap = new Map<string, RunRecord["stepResults"]>();
+  const artifactsMap = new Map<string, Artifact[]>();
+
+  const chunkSize = 100;
+  for (let i = 0; i < bases.length; i += chunkSize) {
+    const chunkIds = bases.slice(i, i + chunkSize).map(b => b.id);
+    const placeholders = chunkIds.map(() => "?").join(", ");
+
+    const detailsRows = db.prepare(`SELECT run_id, started_at, completed_at, cancel_requested_at, current_phase, current_activity, current_step_number, current_scenario_index, current_scenario_title, summary, feature_area, environment, target_url, mode, browser, role, scenario_library_id FROM run_details WHERE run_id IN (${placeholders})`).all(...chunkIds) as RunDetailsRow[];
+    for (const d of detailsRows) detailsMap.set(d.run_id, d);
+
+    const metricsRows = db.prepare(`SELECT run_id, parsed_step_count, generated_scenario_count, step_result_count, artifact_count, defect_count FROM run_metrics WHERE run_id IN (${placeholders})`).all(...chunkIds) as RunMetricsRow[];
+    for (const m of metricsRows) metricsMap.set(m.run_id, m);
+
+    const eventRows = db.prepare(`SELECT id, run_id, timestamp, phase, level, message, category, step_number, scenario_title FROM run_events WHERE run_id IN (${placeholders}) ORDER BY timestamp ASC, id ASC`).all(...chunkIds) as (RunEventRow & { run_id: string })[];
+    for (const e of eventRows) {
+      if (!eventsMap.has(e.run_id)) eventsMap.set(e.run_id, []);
+      eventsMap.get(e.run_id)!.push({
+        id: e.id,
+        timestamp: e.timestamp,
+        phase: e.phase,
+        level: e.level,
+        message: e.message,
+        category: e.category,
+        stepNumber: e.step_number ?? undefined,
+        scenarioTitle: e.scenario_title ?? undefined
+      });
+    }
+
+    const stepRows = db.prepare(`SELECT step_id, run_id, step_number, user_step_text, normalized_action, observed_target, action_result, assertion_result, notes, screenshot_label, screenshot_artifact_id FROM step_results WHERE run_id IN (${placeholders}) ORDER BY step_number ASC, step_id ASC`).all(...chunkIds) as (StepResultRow & { run_id: string })[];
+    for (const s of stepRows) {
+      if (!stepResultsMap.has(s.run_id)) stepResultsMap.set(s.run_id, []);
+      stepResultsMap.get(s.run_id)!.push({
+        stepId: s.step_id,
+        stepNumber: s.step_number,
+        userStepText: s.user_step_text,
+        normalizedAction: s.normalized_action,
+        observedTarget: s.observed_target,
+        actionResult: s.action_result,
+        assertionResult: s.assertion_result,
+        notes: s.notes,
+        screenshotLabel: s.screenshot_label,
+        screenshotArtifactId: s.screenshot_artifact_id ?? undefined
+      });
+    }
+
+    const artifactRows = db.prepare(`SELECT id, run_id, type, label, content FROM run_artifacts WHERE run_id IN (${placeholders}) ORDER BY ordinal ASC, id ASC`).all(...chunkIds) as (ArtifactRow & { run_id: string })[];
+    for (const a of artifactRows) {
+      if (!artifactsMap.has(a.run_id)) artifactsMap.set(a.run_id, []);
+      artifactsMap.get(a.run_id)!.push({
+        id: a.id,
+        type: a.type,
+        label: a.label,
+        content: a.content
+      });
+    }
   }
 
-  const details = readRunDetails(db, base.id);
-  const metrics = readRunMetrics(db, base.id);
-  const events = readRunEvents(db, base.id);
-  const stepResults = readStepResults(db, base.id);
-  const artifacts = readRunArtifacts(db, base.id);
+  return bases.map(base => {
+    const details = detailsMap.get(base.id);
+    const metrics = metricsMap.get(base.id);
+    const events = eventsMap.get(base.id) ?? [];
+    const stepResults = stepResultsMap.get(base.id) ?? [];
+    const artifacts = artifactsMap.get(base.id) ?? [];
 
-  return normalizeRunRecord({
-    ...base,
-    startedAt: details?.started_at ?? base.startedAt,
-    completedAt: details?.completed_at ?? base.completedAt,
-    cancelRequestedAt: details?.cancel_requested_at ?? base.cancelRequestedAt,
-    currentPhase: details?.current_phase ?? base.currentPhase,
-    currentActivity: details?.current_activity ?? base.currentActivity,
-    currentStepNumber: details?.current_step_number ?? base.currentStepNumber,
-    currentScenarioIndex: details?.current_scenario_index ?? base.currentScenarioIndex,
-    currentScenarioTitle: details?.current_scenario_title ?? base.currentScenarioTitle,
-    summary: details?.summary ?? base.summary,
-    plan: details
-      ? {
-          ...base.plan,
-          featureArea: details.feature_area,
-          environment: details.environment,
-          targetUrl: details.target_url,
-          mode: details.mode,
-          browser: details.browser ?? base.plan.browser,
-          role: details.role,
-          scenarioLibraryId: details.scenario_library_id ?? base.plan.scenarioLibraryId
-        }
-      : base.plan,
-    events: events.length ? events : base.events,
-    stepResults: stepResults.length || metrics?.step_result_count === 0 ? stepResults : base.stepResults,
-    artifacts: artifacts.length || metrics?.artifact_count === 0 ? artifacts : base.artifacts
+    return normalizeRunRecord({
+      ...base,
+      startedAt: details?.started_at ?? base.startedAt,
+      completedAt: details?.completed_at ?? base.completedAt,
+      cancelRequestedAt: details?.cancel_requested_at ?? base.cancelRequestedAt,
+      currentPhase: details?.current_phase ?? base.currentPhase,
+      currentActivity: details?.current_activity ?? base.currentActivity,
+      currentStepNumber: details?.current_step_number ?? base.currentStepNumber,
+      currentScenarioIndex: details?.current_scenario_index ?? base.currentScenarioIndex,
+      currentScenarioTitle: details?.current_scenario_title ?? base.currentScenarioTitle,
+      summary: details?.summary ?? base.summary,
+      plan: details
+        ? {
+            ...base.plan,
+            featureArea: details.feature_area,
+            environment: details.environment,
+            targetUrl: details.target_url,
+            mode: details.mode,
+            browser: details.browser ?? base.plan.browser,
+            role: details.role,
+            scenarioLibraryId: details.scenario_library_id ?? base.plan.scenarioLibraryId
+          }
+        : base.plan,
+      events: events.length ? events : base.events,
+      stepResults: stepResults.length || metrics?.step_result_count === 0 ? stepResults : base.stepResults,
+      artifacts: artifacts.length || metrics?.artifact_count === 0 ? artifacts : base.artifacts
+    });
   });
+}
+
+function hydrateRunRecord(db: Database.Database, row: RunRow | undefined): RunRecord | undefined {
+  if (!row) return undefined;
+  return hydrateRunRecords(db, [row])[0];
 }
 
 function hydrateScenarioLibrary(db: Database.Database, row: ScenarioLibraryRow | undefined): ScenarioLibrary | undefined {
@@ -966,7 +1032,7 @@ function createSqliteStoreBackend(): QaStoreBackend {
   function listRunsInternal(): RunRecord[] {
     const db = openDatabase();
     const rows = db.prepare("SELECT id, payload FROM runs ORDER BY created_at DESC").all() as RunRow[];
-    return sortRuns(rows.map((row) => hydrateRunRecord(db, row)).filter((run): run is RunRecord => Boolean(run)));
+    return sortRuns(hydrateRunRecords(db, rows));
   }
 
   function getRunInternal(runId: string): RunRecord | undefined {
