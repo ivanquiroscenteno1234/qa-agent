@@ -17,3 +17,6 @@
 ## 2024-04-15 - SQLite O(N) Read Bottleneck and Bulk IN Hydration
 **Learning:** Sequential `.map()` calls over database result rows that internally trigger subsequent `.get()` or `.all()` SQL queries create an O(N) N+1 query bottleneck. Even though SQLite is in-process and fast, performing hundreds of individual boundary crossings for hydration severely impacts Node.js event loop performance and memory during large list rendering (like `listRunsInternal`).
 **Action:** Always replace row-by-row hydration loops with bulk fetching using chunked `WHERE IN (?, ...)` clauses (chunk sizes of 100). Store fetched relational data in a Map, then do a single pass to stitch related entities in-memory. This transforms an O(N) operation into O(1) database queries.
+## 2024-04-18 - SQLite Batch Query Hydration Optimization
+**Learning:** Refactoring list queries to use chunked `WHERE IN (?, ...)` fetching instead of querying relational data on a row-by-row mapping strategy drastically reduces overhead by mitigating the N+1 query problem, making listing robust without relying on prepared statement micro-optimizations.
+**Action:** When working on collection queries mapping multiple relations, leverage bulk fetch algorithms immediately and ensure proper array chunking (e.g. 100 rows per query) to avoid variable bind limits.

@@ -618,32 +618,89 @@ function hydrateRunRecord(db: Database.Database, row: RunRow | undefined): RunRe
   return hydrateRunRecords(db, [row])[0];
 }
 
-function hydrateScenarioLibrary(db: Database.Database, row: ScenarioLibraryRow | undefined): ScenarioLibrary | undefined {
-  const base = parseScenarioLibraryRow(row);
 
-  if (!base) {
-    return undefined;
+// ⚡ Bolt: Batch fetch related scenario library entities using WHERE IN (?, ...) to prevent O(N) N+1 query bottlenecks during list operations
+function hydrateScenarioLibraries(db: Database.Database, rows: ScenarioLibraryRow[]): ScenarioLibrary[] {
+  const bases = rows.map(parseScenarioLibraryRow).filter((r): r is ScenarioLibrary => Boolean(r));
+  if (bases.length === 0) return [];
+
+  const detailsMap = new Map<string, ScenarioLibraryDetailsRow>();
+  const versionsMap = new Map<string, ScenarioLibraryVersionRow[]>();
+  const scenariosMap = new Map<string, ScenarioLibraryScenarioRow[]>();
+
+  const chunkSize = 100;
+  for (let i = 0; i < bases.length; i += chunkSize) {
+    const chunkIds = bases.slice(i, i + chunkSize).map(b => b.id);
+    const placeholders = chunkIds.map(() => "?").join(", ");
+
+    const detailsRows = db.prepare(`SELECT library_id, source_run_id, feature_area, environment, target_url, role, created_at, version, risk_summary_json, coverage_gaps_json FROM scenario_library_details WHERE library_id IN (${placeholders})`).all(...chunkIds) as ScenarioLibraryDetailsRow[];
+    for (const d of detailsRows) detailsMap.set(d.library_id, d);
+
+    const versionRows = db.prepare(`SELECT library_id, version, created_at, source_run_id, scenario_count, summary, change_summary_json, baseline_insights_json FROM scenario_library_versions WHERE library_id IN (${placeholders}) ORDER BY version ASC`).all(...chunkIds) as (ScenarioLibraryVersionRow & { library_id: string })[];
+    for (const v of versionRows) {
+      if (!versionsMap.has(v.library_id)) versionsMap.set(v.library_id, []);
+      versionsMap.get(v.library_id)!.push(v);
+    }
+
+    const scenarioRows = db.prepare(`SELECT library_id, scenario_id, ordinal, title, priority, type, prerequisites_json, steps_json, expected_result, risk_rationale, approved_for_automation FROM scenario_library_scenarios WHERE library_id IN (${placeholders}) ORDER BY ordinal ASC, scenario_id ASC`).all(...chunkIds) as (ScenarioLibraryScenarioRow & { library_id: string })[];
+    for (const s of scenarioRows) {
+      if (!scenariosMap.has(s.library_id)) scenariosMap.set(s.library_id, []);
+      scenariosMap.get(s.library_id)!.push(s);
+    }
   }
 
-  const details = readScenarioLibraryDetails(db, base.id);
-  const versions = readScenarioLibraryVersions(db, base.id);
-  const scenarios = readScenarioLibraryScenarios(db, base.id);
+  return bases.map(base => {
+    const details = detailsMap.get(base.id);
+    const versionRows = versionsMap.get(base.id) ?? [];
+    const scenarioRows = scenariosMap.get(base.id) ?? [];
 
-  return normalizeScenarioLibraryRecord({
-    ...base,
-    sourceRunId: details?.source_run_id ?? base.sourceRunId,
-    featureArea: details?.feature_area ?? base.featureArea,
-    environment: details?.environment ?? base.environment,
-    targetUrl: details?.target_url ?? base.targetUrl,
-    role: details?.role ?? base.role,
-    createdAt: details?.created_at ?? base.createdAt,
-    version: details?.version ?? base.version,
-    riskSummary: details ? (JSON.parse(details.risk_summary_json) as string[]) : base.riskSummary,
-    coverageGaps: details ? (JSON.parse(details.coverage_gaps_json) as string[]) : base.coverageGaps,
-    versions: versions.length ? versions : base.versions,
-    scenarios: scenarios.length ? scenarios : base.scenarios
+    const versions = versionRows.map(row => {
+      const baselineInsights = JSON.parse(row.baseline_insights_json || '[]') as AnalysisInsight[];
+      return {
+        version: row.version,
+        createdAt: row.created_at,
+        sourceRunId: row.source_run_id ?? undefined,
+        scenarioCount: row.scenario_count,
+        summary: row.summary,
+        changeSummary: row.change_summary_json ? JSON.parse(row.change_summary_json) : undefined,
+        ...(baselineInsights.length ? { baselineInsights } : {})
+      };
+    });
+
+    const scenarios = scenarioRows.map(row => ({
+      id: row.scenario_id,
+      title: row.title,
+      priority: row.priority,
+      type: row.type,
+      prerequisites: JSON.parse(row.prerequisites_json) as string[],
+      steps: JSON.parse(row.steps_json) as string[],
+      expectedResult: row.expected_result,
+      riskRationale: row.risk_rationale,
+      approvedForAutomation: Boolean(row.approved_for_automation)
+    }));
+
+    return normalizeScenarioLibraryRecord({
+      ...base,
+      sourceRunId: details?.source_run_id ?? base.sourceRunId,
+      featureArea: details?.feature_area ?? base.featureArea,
+      environment: details?.environment ?? base.environment,
+      targetUrl: details?.target_url ?? base.targetUrl,
+      role: details?.role ?? base.role,
+      createdAt: details?.created_at ?? base.createdAt,
+      version: details?.version ?? base.version,
+      riskSummary: details ? (JSON.parse(details.risk_summary_json) as string[]) : base.riskSummary,
+      coverageGaps: details ? (JSON.parse(details.coverage_gaps_json) as string[]) : base.coverageGaps,
+      versions: versions.length ? versions : base.versions,
+      scenarios: scenarios.length ? scenarios : base.scenarios
+    });
   });
 }
+
+function hydrateScenarioLibrary(db: Database.Database, row: ScenarioLibraryRow | undefined): ScenarioLibrary | undefined {
+  if (!row) return undefined;
+  return hydrateScenarioLibraries(db, [row])[0];
+}
+
 
 function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
   db.prepare(
@@ -1291,7 +1348,7 @@ function createSqliteStoreBackend(): QaStoreBackend {
   function listScenarioLibrariesInternal(): ScenarioLibrary[] {
     const db = openDatabase();
     const rows = db.prepare("SELECT id, payload FROM scenario_libraries ORDER BY updated_at DESC").all() as ScenarioLibraryRow[];
-    return sortScenarioLibraries(rows.map((row) => hydrateScenarioLibrary(db, row)).filter((library): library is ScenarioLibrary => Boolean(library)));
+    return sortScenarioLibraries(hydrateScenarioLibraries(db, rows));
   }
 
   function getScenarioLibraryInternal(scenarioLibraryId: string): ScenarioLibrary | undefined {
