@@ -74,13 +74,14 @@ export function EnvironmentCard({ environment }: EnvironmentCardProps) {
       {deleteError && <p className="muted" style={{ color: "var(--color-danger, #c0392b)" }}>{deleteError}</p>}
 
       <div className="settings-card-actions">
-        <button type="button" disabled title="Active health probes are not implemented yet.">
+        <button aria-label="Probe environment health" type="button" disabled title="Active health probes are not implemented yet.">
           Probe
         </button>
-        <button type="button" disabled title="Environment editing is not implemented yet.">
+        <button aria-label="Edit environment profile" type="button" disabled title="Environment editing is not implemented yet.">
           Edit
         </button>
         <button
+          aria-label="Delete environment profile"
           type="button"
           disabled={isDeleting}
           onClick={handleDelete}
