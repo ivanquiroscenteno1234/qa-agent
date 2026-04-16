@@ -30,9 +30,9 @@ export function buildScenarioLibraryCards(libraries: ScenarioLibrary[], filters:
 }
 
 export function collectScenarioLibraryFeatureAreas(libraries: ScenarioLibrary[]): string[] {
-  return [...new Set(libraries.map((library) => library.featureArea).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  return [...new Set(libraries.map((library) => library.featureArea.trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right));
 }
 
 export function collectScenarioLibraryAuthors(libraries: ScenarioLibrary[]): string[] {
-  return [...new Set(libraries.map((library) => library.author ?? "").filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  return [...new Set(libraries.map((library) => (library.author ?? "").trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right));
 }
