@@ -179,43 +179,62 @@ const runArtifactsStmtCache = new Map<number, Database.Statement>();
 const scenarioLibraryVersionsStmtCache = new Map<number, Database.Statement>();
 const scenarioLibraryScenariosStmtCache = new Map<number, Database.Statement>();
 
+const readRunDetailsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readRunMetricsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readRunEventsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readStepResultsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readRunArtifactsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readScenarioLibraryDetailsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readScenarioLibraryVersionsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readScenarioLibraryScenariosStmt = new WeakMap<Database.Database, Database.Statement>();
+
 function readRunDetails(db: Database.Database, runId: string): RunDetailsRow | undefined {
-  return db.prepare(
-    `SELECT
-      run_id,
-      started_at,
-      completed_at,
-      cancel_requested_at,
-      current_phase,
-      current_activity,
-      current_step_number,
-      current_scenario_index,
-      current_scenario_title,
-      summary,
-      feature_area,
-      environment,
-      target_url,
-      mode,
-      browser,
-      role,
-      scenario_library_id
-    FROM run_details
-    WHERE run_id = ?`
-  ).get(runId) as RunDetailsRow | undefined;
+  let stmt = readRunDetailsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        run_id,
+        started_at,
+        completed_at,
+        cancel_requested_at,
+        current_phase,
+        current_activity,
+        current_step_number,
+        current_scenario_index,
+        current_scenario_title,
+        summary,
+        feature_area,
+        environment,
+        target_url,
+        mode,
+        browser,
+        role,
+        scenario_library_id
+      FROM run_details
+      WHERE run_id = ?`
+    );
+    readRunDetailsStmt.set(db, stmt);
+  }
+  return stmt.get(runId) as RunDetailsRow | undefined;
 }
 
 function readRunMetrics(db: Database.Database, runId: string): RunMetricsRow | undefined {
-  return db.prepare(
-    `SELECT
-      run_id,
-      parsed_step_count,
-      generated_scenario_count,
-      step_result_count,
-      artifact_count,
-      defect_count
-    FROM run_metrics
-    WHERE run_id = ?`
-  ).get(runId) as RunMetricsRow | undefined;
+  let stmt = readRunMetricsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        run_id,
+        parsed_step_count,
+        generated_scenario_count,
+        step_result_count,
+        artifact_count,
+        defect_count
+      FROM run_metrics
+      WHERE run_id = ?`
+    );
+    readRunMetricsStmt.set(db, stmt);
+  }
+  return stmt.get(runId) as RunMetricsRow | undefined;
 }
 
 function readRunEvents(db: Database.Database, runId: string): RunEvent[] {
@@ -279,16 +298,21 @@ function readStepResults(db: Database.Database, runId: string): RunRecord["stepR
 }
 
 function readRunArtifacts(db: Database.Database, runId: string): Artifact[] {
-  const rows = db.prepare(
-    `SELECT
-      id,
-      type,
-      label,
-      content
-    FROM run_artifacts
-    WHERE run_id = ?
-    ORDER BY ordinal ASC, id ASC`
-  ).all(runId) as ArtifactRow[];
+  let stmt = readRunArtifactsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        id,
+        type,
+        label,
+        content
+      FROM run_artifacts
+      WHERE run_id = ?
+      ORDER BY ordinal ASC, id ASC`
+    );
+    readRunArtifactsStmt.set(db, stmt);
+  }
+  const rows = stmt.all(runId) as ArtifactRow[];
 
   return rows.map((row) => ({
     id: row.id,
@@ -298,12 +322,18 @@ function readRunArtifacts(db: Database.Database, runId: string): Artifact[] {
   }));
 }
 
+const readRunArtifactStmt = new WeakMap<Database.Database, Database.Statement>();
 function readRunArtifact(db: Database.Database, runId: string, artifactId: string): Artifact | undefined {
-  const row = db.prepare(
-    `SELECT id, type, label, content
-    FROM run_artifacts
-    WHERE run_id = ? AND id = ?`
-  ).get(runId, artifactId) as ArtifactRow | undefined;
+  let stmt = readRunArtifactStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT id, type, label, content
+      FROM run_artifacts
+      WHERE run_id = ? AND id = ?`
+    );
+    readRunArtifactStmt.set(db, stmt);
+  }
+  const row = stmt.get(runId, artifactId) as ArtifactRow | undefined;
 
   return row
     ? {
@@ -316,37 +346,47 @@ function readRunArtifact(db: Database.Database, runId: string, artifactId: strin
 }
 
 function readScenarioLibraryDetails(db: Database.Database, libraryId: string): ScenarioLibraryDetailsRow | undefined {
-  return db.prepare(
-    `SELECT
-      library_id,
-      source_run_id,
-      feature_area,
-      environment,
-      target_url,
-      role,
-      created_at,
-      version,
-      risk_summary_json,
-      coverage_gaps_json
-    FROM scenario_library_details
-    WHERE library_id = ?`
-  ).get(libraryId) as ScenarioLibraryDetailsRow | undefined;
+  let stmt = readScenarioLibraryDetailsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        library_id,
+        source_run_id,
+        feature_area,
+        environment,
+        target_url,
+        role,
+        created_at,
+        version,
+        risk_summary_json,
+        coverage_gaps_json
+      FROM scenario_library_details
+      WHERE library_id = ?`
+    );
+    readScenarioLibraryDetailsStmt.set(db, stmt);
+  }
+  return stmt.get(libraryId) as ScenarioLibraryDetailsRow | undefined;
 }
 
 function readScenarioLibraryVersions(db: Database.Database, libraryId: string): ScenarioLibrary["versions"] {
-  const rows = db.prepare(
-    `SELECT
-      version,
-      created_at,
-      source_run_id,
-      scenario_count,
-      summary,
-      change_summary_json,
-      baseline_insights_json
-    FROM scenario_library_versions
-    WHERE library_id = ?
-    ORDER BY version ASC`
-  ).all(libraryId) as ScenarioLibraryVersionRow[];
+  let stmt = readScenarioLibraryVersionsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        version,
+        created_at,
+        source_run_id,
+        scenario_count,
+        summary,
+        change_summary_json,
+        baseline_insights_json
+      FROM scenario_library_versions
+      WHERE library_id = ?
+      ORDER BY version ASC`
+    );
+    readScenarioLibraryVersionsStmt.set(db, stmt);
+  }
+  const rows = stmt.all(libraryId) as ScenarioLibraryVersionRow[];
 
   return rows.map((row) => {
     const baselineInsights = JSON.parse(row.baseline_insights_json || '[]') as AnalysisInsight[];
@@ -464,46 +504,112 @@ function listRunSummariesFromSql(db: Database.Database): RunSummary[] {
   return rows.map(mapRunSummaryRow);
 }
 
-function hydrateRunRecord(db: Database.Database, row: RunRow | undefined): RunRecord | undefined {
-  const base = parseRunRow(row);
+// ⚡ Bolt: Batch fetch related entities using WHERE IN (?, ...) to prevent O(N) N+1 query bottlenecks during list operations
+function hydrateRunRecords(db: Database.Database, rows: RunRow[]): RunRecord[] {
+  const bases = rows.map(parseRunRow).filter((r): r is RunRecord => Boolean(r));
+  if (bases.length === 0) return [];
 
-  if (!base) {
-    return undefined;
+  const detailsMap = new Map<string, RunDetailsRow>();
+  const metricsMap = new Map<string, RunMetricsRow>();
+  const eventsMap = new Map<string, RunEvent[]>();
+  const stepResultsMap = new Map<string, RunRecord["stepResults"]>();
+  const artifactsMap = new Map<string, Artifact[]>();
+
+  const chunkSize = 100;
+  for (let i = 0; i < bases.length; i += chunkSize) {
+    const chunkIds = bases.slice(i, i + chunkSize).map(b => b.id);
+    const placeholders = chunkIds.map(() => "?").join(", ");
+
+    const detailsRows = db.prepare(`SELECT run_id, started_at, completed_at, cancel_requested_at, current_phase, current_activity, current_step_number, current_scenario_index, current_scenario_title, summary, feature_area, environment, target_url, mode, browser, role, scenario_library_id FROM run_details WHERE run_id IN (${placeholders})`).all(...chunkIds) as RunDetailsRow[];
+    for (const d of detailsRows) detailsMap.set(d.run_id, d);
+
+    const metricsRows = db.prepare(`SELECT run_id, parsed_step_count, generated_scenario_count, step_result_count, artifact_count, defect_count FROM run_metrics WHERE run_id IN (${placeholders})`).all(...chunkIds) as RunMetricsRow[];
+    for (const m of metricsRows) metricsMap.set(m.run_id, m);
+
+    const eventRows = db.prepare(`SELECT id, run_id, timestamp, phase, level, message, category, step_number, scenario_title FROM run_events WHERE run_id IN (${placeholders}) ORDER BY timestamp ASC, id ASC`).all(...chunkIds) as (RunEventRow & { run_id: string })[];
+    for (const e of eventRows) {
+      if (!eventsMap.has(e.run_id)) eventsMap.set(e.run_id, []);
+      eventsMap.get(e.run_id)!.push({
+        id: e.id,
+        timestamp: e.timestamp,
+        phase: e.phase,
+        level: e.level,
+        message: e.message,
+        category: e.category,
+        stepNumber: e.step_number ?? undefined,
+        scenarioTitle: e.scenario_title ?? undefined
+      });
+    }
+
+    const stepRows = db.prepare(`SELECT step_id, run_id, step_number, user_step_text, normalized_action, observed_target, action_result, assertion_result, notes, screenshot_label, screenshot_artifact_id FROM step_results WHERE run_id IN (${placeholders}) ORDER BY step_number ASC, step_id ASC`).all(...chunkIds) as (StepResultRow & { run_id: string })[];
+    for (const s of stepRows) {
+      if (!stepResultsMap.has(s.run_id)) stepResultsMap.set(s.run_id, []);
+      stepResultsMap.get(s.run_id)!.push({
+        stepId: s.step_id,
+        stepNumber: s.step_number,
+        userStepText: s.user_step_text,
+        normalizedAction: s.normalized_action,
+        observedTarget: s.observed_target,
+        actionResult: s.action_result,
+        assertionResult: s.assertion_result,
+        notes: s.notes,
+        screenshotLabel: s.screenshot_label,
+        screenshotArtifactId: s.screenshot_artifact_id ?? undefined
+      });
+    }
+
+    const artifactRows = db.prepare(`SELECT id, run_id, type, label, content FROM run_artifacts WHERE run_id IN (${placeholders}) ORDER BY ordinal ASC, id ASC`).all(...chunkIds) as (ArtifactRow & { run_id: string })[];
+    for (const a of artifactRows) {
+      if (!artifactsMap.has(a.run_id)) artifactsMap.set(a.run_id, []);
+      artifactsMap.get(a.run_id)!.push({
+        id: a.id,
+        type: a.type,
+        label: a.label,
+        content: a.content
+      });
+    }
   }
 
-  const details = readRunDetails(db, base.id);
-  const metrics = readRunMetrics(db, base.id);
-  const events = readRunEvents(db, base.id);
-  const stepResults = readStepResults(db, base.id);
-  const artifacts = readRunArtifacts(db, base.id);
+  return bases.map(base => {
+    const details = detailsMap.get(base.id);
+    const metrics = metricsMap.get(base.id);
+    const events = eventsMap.get(base.id) ?? [];
+    const stepResults = stepResultsMap.get(base.id) ?? [];
+    const artifacts = artifactsMap.get(base.id) ?? [];
 
-  return normalizeRunRecord({
-    ...base,
-    startedAt: details?.started_at ?? base.startedAt,
-    completedAt: details?.completed_at ?? base.completedAt,
-    cancelRequestedAt: details?.cancel_requested_at ?? base.cancelRequestedAt,
-    currentPhase: details?.current_phase ?? base.currentPhase,
-    currentActivity: details?.current_activity ?? base.currentActivity,
-    currentStepNumber: details?.current_step_number ?? base.currentStepNumber,
-    currentScenarioIndex: details?.current_scenario_index ?? base.currentScenarioIndex,
-    currentScenarioTitle: details?.current_scenario_title ?? base.currentScenarioTitle,
-    summary: details?.summary ?? base.summary,
-    plan: details
-      ? {
-          ...base.plan,
-          featureArea: details.feature_area,
-          environment: details.environment,
-          targetUrl: details.target_url,
-          mode: details.mode,
-          browser: details.browser ?? base.plan.browser,
-          role: details.role,
-          scenarioLibraryId: details.scenario_library_id ?? base.plan.scenarioLibraryId
-        }
-      : base.plan,
-    events: events.length ? events : base.events,
-    stepResults: stepResults.length || metrics?.step_result_count === 0 ? stepResults : base.stepResults,
-    artifacts: artifacts.length || metrics?.artifact_count === 0 ? artifacts : base.artifacts
+    return normalizeRunRecord({
+      ...base,
+      startedAt: details?.started_at ?? base.startedAt,
+      completedAt: details?.completed_at ?? base.completedAt,
+      cancelRequestedAt: details?.cancel_requested_at ?? base.cancelRequestedAt,
+      currentPhase: details?.current_phase ?? base.currentPhase,
+      currentActivity: details?.current_activity ?? base.currentActivity,
+      currentStepNumber: details?.current_step_number ?? base.currentStepNumber,
+      currentScenarioIndex: details?.current_scenario_index ?? base.currentScenarioIndex,
+      currentScenarioTitle: details?.current_scenario_title ?? base.currentScenarioTitle,
+      summary: details?.summary ?? base.summary,
+      plan: details
+        ? {
+            ...base.plan,
+            featureArea: details.feature_area,
+            environment: details.environment,
+            targetUrl: details.target_url,
+            mode: details.mode,
+            browser: details.browser ?? base.plan.browser,
+            role: details.role,
+            scenarioLibraryId: details.scenario_library_id ?? base.plan.scenarioLibraryId
+          }
+        : base.plan,
+      events: events.length ? events : base.events,
+      stepResults: stepResults.length || metrics?.step_result_count === 0 ? stepResults : base.stepResults,
+      artifacts: artifacts.length || metrics?.artifact_count === 0 ? artifacts : base.artifacts
+    });
   });
+}
+
+function hydrateRunRecord(db: Database.Database, row: RunRow | undefined): RunRecord | undefined {
+  if (!row) return undefined;
+  return hydrateRunRecords(db, [row])[0];
 }
 
 function hydrateScenarioLibrary(db: Database.Database, row: ScenarioLibraryRow | undefined): ScenarioLibrary | undefined {
@@ -966,7 +1072,7 @@ function createSqliteStoreBackend(): QaStoreBackend {
   function listRunsInternal(): RunRecord[] {
     const db = openDatabase();
     const rows = db.prepare("SELECT id, payload FROM runs ORDER BY created_at DESC").all() as RunRow[];
-    return sortRuns(rows.map((row) => hydrateRunRecord(db, row)).filter((run): run is RunRecord => Boolean(run)));
+    return sortRuns(hydrateRunRecords(db, rows));
   }
 
   function getRunInternal(runId: string): RunRecord | undefined {

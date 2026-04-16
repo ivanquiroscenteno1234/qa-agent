@@ -18,11 +18,25 @@ describe("isValidTargetUrl", () => {
     expect(isValidTargetUrl("ftp://example.com")).toBe(false);
     expect(isValidTargetUrl("mailto:test@example.com")).toBe(false);
     expect(isValidTargetUrl("javascript:alert(1)")).toBe(false);
+    expect(isValidTargetUrl("ws://example.com")).toBe(false);
+    expect(isValidTargetUrl("wss://example.com")).toBe(false);
+    expect(isValidTargetUrl("file:///etc/passwd")).toBe(false);
+    expect(isValidTargetUrl("data:text/html,<html>")).toBe(false);
   });
 
   it("returns false for malformed URLs", () => {
     expect(isValidTargetUrl("not-a-url")).toBe(false);
     expect(isValidTargetUrl("://missing-protocol")).toBe(false);
+    expect(isValidTargetUrl("http://")).toBe(false);
+    expect(isValidTargetUrl("https://")).toBe(false);
+    expect(isValidTargetUrl("http://:8080")).toBe(false);
+    expect(isValidTargetUrl("http://?query=1")).toBe(false);
+    expect(isValidTargetUrl("http://#hash")).toBe(false);
+  });
+
+  it("returns false for URLs with invalid ports", () => {
+    expect(isValidTargetUrl("http://localhost:65536")).toBe(false);
+    expect(isValidTargetUrl("http://localhost:invalid")).toBe(false);
   });
 
   it("returns false for relative paths", () => {
