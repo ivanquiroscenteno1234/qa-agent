@@ -59,10 +59,33 @@ describe("Scenario Library View Model", () => {
       expect(result).toEqual(["Alice"]);
     });
 
-    it("should return an empty array if all authors are falsy", () => {
+    it("should filter out whitespace-only authors", () => {
+      const libraries = [
+        createMockLibrary({ author: "Alice" }),
+        createMockLibrary({ author: "   " }),
+      ];
+
+      const result = collectScenarioLibraryAuthors(libraries);
+      expect(result).toEqual(["Alice"]);
+    });
+
+    it("should trim and deduplicate authors with leading or trailing whitespaces", () => {
+      const libraries = [
+        createMockLibrary({ author: " Alice " }),
+        createMockLibrary({ author: "Alice" }),
+        createMockLibrary({ author: "Bob  " }),
+        createMockLibrary({ author: "  Bob" }),
+      ];
+
+      const result = collectScenarioLibraryAuthors(libraries);
+      expect(result).toEqual(["Alice", "Bob"]);
+    });
+
+    it("should return an empty array if all authors are falsy or whitespace-only", () => {
       const libraries = [
         createMockLibrary({ author: undefined }),
         createMockLibrary({ author: "" }),
+        createMockLibrary({ author: "   " }),
       ];
 
       const result = collectScenarioLibraryAuthors(libraries);
@@ -95,6 +118,27 @@ describe("Scenario Library View Model", () => {
 
       const result = collectScenarioLibraryFeatureAreas(libraries);
       expect(result).toEqual(["Auth"]);
+    });
+
+    it("should filter out whitespace-only feature areas", () => {
+      const libraries = [
+        createMockLibrary({ featureArea: "Auth" }),
+        createMockLibrary({ featureArea: "   " }),
+      ];
+
+      const result = collectScenarioLibraryFeatureAreas(libraries);
+      expect(result).toEqual(["Auth"]);
+    });
+
+    it("should trim and deduplicate feature areas with leading or trailing whitespaces", () => {
+      const libraries = [
+        createMockLibrary({ featureArea: " Auth " }),
+        createMockLibrary({ featureArea: "Auth" }),
+        createMockLibrary({ featureArea: "Settings  " }),
+      ];
+
+      const result = collectScenarioLibraryFeatureAreas(libraries);
+      expect(result).toEqual(["Auth", "Settings"]);
     });
 
     it("should handle an empty list of libraries", () => {
