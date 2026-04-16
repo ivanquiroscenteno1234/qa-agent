@@ -45,7 +45,7 @@ export async function resolveCredentials(plan: RunPlan, parsedSteps: ParsedStep[
   }
 
   if (plan.loginEmail && plan.loginPassword) {
-    return { email: plan.loginEmail, password: plan.loginPassword };
+    return { email: plan.loginEmail, password: revealCredentialSecret(plan.loginPassword) ?? "" };
   }
 
   const loginStep = parsedSteps.find((step) => step.actionType === "login");
