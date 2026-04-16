@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { deleteRun, getRun } from "@/lib/qa/store";
+import { sanitizeRunRecord } from "@/lib/qa/storage/shared";
 
 export async function GET(_request: Request, context: { params: Promise<{ runId: string }> }) {
   const { runId } = await context.params;
@@ -10,7 +11,7 @@ export async function GET(_request: Request, context: { params: Promise<{ runId:
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ run });
+  return NextResponse.json({ run: sanitizeRunRecord(run) });
 }
 
 export async function DELETE(_request: Request, context: { params: Promise<{ runId: string }> }) {

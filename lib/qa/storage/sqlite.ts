@@ -173,49 +173,74 @@ type RunSummaryRow = {
 
 let database: Database.Database | null = null;
 
+const runsStmtCache = new Map<number, Database.Statement>();
+const runDetailsStmtCache = new Map<number, Database.Statement>();
+const runMetricsStmtCache = new Map<number, Database.Statement>();
 const runEventsStmtCache = new Map<number, Database.Statement>();
 const stepResultsStmtCache = new Map<number, Database.Statement>();
 const runArtifactsStmtCache = new Map<number, Database.Statement>();
+
+const scenarioLibrariesStmtCache = new Map<number, Database.Statement>();
+const scenarioLibraryDetailsStmtCache = new Map<number, Database.Statement>();
 const scenarioLibraryVersionsStmtCache = new Map<number, Database.Statement>();
 const scenarioLibraryScenariosStmtCache = new Map<number, Database.Statement>();
 
+const readRunDetailsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readRunMetricsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readRunEventsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readStepResultsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readRunArtifactsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readScenarioLibraryDetailsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readScenarioLibraryVersionsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readScenarioLibraryScenariosStmt = new WeakMap<Database.Database, Database.Statement>();
+
 function readRunDetails(db: Database.Database, runId: string): RunDetailsRow | undefined {
-  return db.prepare(
-    `SELECT
-      run_id,
-      started_at,
-      completed_at,
-      cancel_requested_at,
-      current_phase,
-      current_activity,
-      current_step_number,
-      current_scenario_index,
-      current_scenario_title,
-      summary,
-      feature_area,
-      environment,
-      target_url,
-      mode,
-      browser,
-      role,
-      scenario_library_id
-    FROM run_details
-    WHERE run_id = ?`
-  ).get(runId) as RunDetailsRow | undefined;
+  let stmt = readRunDetailsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        run_id,
+        started_at,
+        completed_at,
+        cancel_requested_at,
+        current_phase,
+        current_activity,
+        current_step_number,
+        current_scenario_index,
+        current_scenario_title,
+        summary,
+        feature_area,
+        environment,
+        target_url,
+        mode,
+        browser,
+        role,
+        scenario_library_id
+      FROM run_details
+      WHERE run_id = ?`
+    );
+    readRunDetailsStmt.set(db, stmt);
+  }
+  return stmt.get(runId) as RunDetailsRow | undefined;
 }
 
 function readRunMetrics(db: Database.Database, runId: string): RunMetricsRow | undefined {
-  return db.prepare(
-    `SELECT
-      run_id,
-      parsed_step_count,
-      generated_scenario_count,
-      step_result_count,
-      artifact_count,
-      defect_count
-    FROM run_metrics
-    WHERE run_id = ?`
-  ).get(runId) as RunMetricsRow | undefined;
+  let stmt = readRunMetricsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        run_id,
+        parsed_step_count,
+        generated_scenario_count,
+        step_result_count,
+        artifact_count,
+        defect_count
+      FROM run_metrics
+      WHERE run_id = ?`
+    );
+    readRunMetricsStmt.set(db, stmt);
+  }
+  return stmt.get(runId) as RunMetricsRow | undefined;
 }
 
 function readRunEvents(db: Database.Database, runId: string): RunEvent[] {
@@ -279,16 +304,21 @@ function readStepResults(db: Database.Database, runId: string): RunRecord["stepR
 }
 
 function readRunArtifacts(db: Database.Database, runId: string): Artifact[] {
-  const rows = db.prepare(
-    `SELECT
-      id,
-      type,
-      label,
-      content
-    FROM run_artifacts
-    WHERE run_id = ?
-    ORDER BY ordinal ASC, id ASC`
-  ).all(runId) as ArtifactRow[];
+  let stmt = readRunArtifactsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        id,
+        type,
+        label,
+        content
+      FROM run_artifacts
+      WHERE run_id = ?
+      ORDER BY ordinal ASC, id ASC`
+    );
+    readRunArtifactsStmt.set(db, stmt);
+  }
+  const rows = stmt.all(runId) as ArtifactRow[];
 
   return rows.map((row) => ({
     id: row.id,
@@ -298,12 +328,18 @@ function readRunArtifacts(db: Database.Database, runId: string): Artifact[] {
   }));
 }
 
+const readRunArtifactStmt = new WeakMap<Database.Database, Database.Statement>();
 function readRunArtifact(db: Database.Database, runId: string, artifactId: string): Artifact | undefined {
-  const row = db.prepare(
-    `SELECT id, type, label, content
-    FROM run_artifacts
-    WHERE run_id = ? AND id = ?`
-  ).get(runId, artifactId) as ArtifactRow | undefined;
+  let stmt = readRunArtifactStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT id, type, label, content
+      FROM run_artifacts
+      WHERE run_id = ? AND id = ?`
+    );
+    readRunArtifactStmt.set(db, stmt);
+  }
+  const row = stmt.get(runId, artifactId) as ArtifactRow | undefined;
 
   return row
     ? {
@@ -316,37 +352,47 @@ function readRunArtifact(db: Database.Database, runId: string, artifactId: strin
 }
 
 function readScenarioLibraryDetails(db: Database.Database, libraryId: string): ScenarioLibraryDetailsRow | undefined {
-  return db.prepare(
-    `SELECT
-      library_id,
-      source_run_id,
-      feature_area,
-      environment,
-      target_url,
-      role,
-      created_at,
-      version,
-      risk_summary_json,
-      coverage_gaps_json
-    FROM scenario_library_details
-    WHERE library_id = ?`
-  ).get(libraryId) as ScenarioLibraryDetailsRow | undefined;
+  let stmt = readScenarioLibraryDetailsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        library_id,
+        source_run_id,
+        feature_area,
+        environment,
+        target_url,
+        role,
+        created_at,
+        version,
+        risk_summary_json,
+        coverage_gaps_json
+      FROM scenario_library_details
+      WHERE library_id = ?`
+    );
+    readScenarioLibraryDetailsStmt.set(db, stmt);
+  }
+  return stmt.get(libraryId) as ScenarioLibraryDetailsRow | undefined;
 }
 
 function readScenarioLibraryVersions(db: Database.Database, libraryId: string): ScenarioLibrary["versions"] {
-  const rows = db.prepare(
-    `SELECT
-      version,
-      created_at,
-      source_run_id,
-      scenario_count,
-      summary,
-      change_summary_json,
-      baseline_insights_json
-    FROM scenario_library_versions
-    WHERE library_id = ?
-    ORDER BY version ASC`
-  ).all(libraryId) as ScenarioLibraryVersionRow[];
+  let stmt = readScenarioLibraryVersionsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        version,
+        created_at,
+        source_run_id,
+        scenario_count,
+        summary,
+        change_summary_json,
+        baseline_insights_json
+      FROM scenario_library_versions
+      WHERE library_id = ?
+      ORDER BY version ASC`
+    );
+    readScenarioLibraryVersionsStmt.set(db, stmt);
+  }
+  const rows = stmt.all(libraryId) as ScenarioLibraryVersionRow[];
 
   return rows.map((row) => {
     const baselineInsights = JSON.parse(row.baseline_insights_json || '[]') as AnalysisInsight[];
@@ -464,46 +510,112 @@ function listRunSummariesFromSql(db: Database.Database): RunSummary[] {
   return rows.map(mapRunSummaryRow);
 }
 
-function hydrateRunRecord(db: Database.Database, row: RunRow | undefined): RunRecord | undefined {
-  const base = parseRunRow(row);
+// ⚡ Bolt: Batch fetch related entities using WHERE IN (?, ...) to prevent O(N) N+1 query bottlenecks during list operations
+function hydrateRunRecords(db: Database.Database, rows: RunRow[]): RunRecord[] {
+  const bases = rows.map(parseRunRow).filter((r): r is RunRecord => Boolean(r));
+  if (bases.length === 0) return [];
 
-  if (!base) {
-    return undefined;
+  const detailsMap = new Map<string, RunDetailsRow>();
+  const metricsMap = new Map<string, RunMetricsRow>();
+  const eventsMap = new Map<string, RunEvent[]>();
+  const stepResultsMap = new Map<string, RunRecord["stepResults"]>();
+  const artifactsMap = new Map<string, Artifact[]>();
+
+  const chunkSize = 100;
+  for (let i = 0; i < bases.length; i += chunkSize) {
+    const chunkIds = bases.slice(i, i + chunkSize).map(b => b.id);
+    const placeholders = chunkIds.map(() => "?").join(", ");
+
+    const detailsRows = db.prepare(`SELECT run_id, started_at, completed_at, cancel_requested_at, current_phase, current_activity, current_step_number, current_scenario_index, current_scenario_title, summary, feature_area, environment, target_url, mode, browser, role, scenario_library_id FROM run_details WHERE run_id IN (${placeholders})`).all(...chunkIds) as RunDetailsRow[];
+    for (const d of detailsRows) detailsMap.set(d.run_id, d);
+
+    const metricsRows = db.prepare(`SELECT run_id, parsed_step_count, generated_scenario_count, step_result_count, artifact_count, defect_count FROM run_metrics WHERE run_id IN (${placeholders})`).all(...chunkIds) as RunMetricsRow[];
+    for (const m of metricsRows) metricsMap.set(m.run_id, m);
+
+    const eventRows = db.prepare(`SELECT id, run_id, timestamp, phase, level, message, category, step_number, scenario_title FROM run_events WHERE run_id IN (${placeholders}) ORDER BY timestamp ASC, id ASC`).all(...chunkIds) as (RunEventRow & { run_id: string })[];
+    for (const e of eventRows) {
+      if (!eventsMap.has(e.run_id)) eventsMap.set(e.run_id, []);
+      eventsMap.get(e.run_id)!.push({
+        id: e.id,
+        timestamp: e.timestamp,
+        phase: e.phase,
+        level: e.level,
+        message: e.message,
+        category: e.category,
+        stepNumber: e.step_number ?? undefined,
+        scenarioTitle: e.scenario_title ?? undefined
+      });
+    }
+
+    const stepRows = db.prepare(`SELECT step_id, run_id, step_number, user_step_text, normalized_action, observed_target, action_result, assertion_result, notes, screenshot_label, screenshot_artifact_id FROM step_results WHERE run_id IN (${placeholders}) ORDER BY step_number ASC, step_id ASC`).all(...chunkIds) as (StepResultRow & { run_id: string })[];
+    for (const s of stepRows) {
+      if (!stepResultsMap.has(s.run_id)) stepResultsMap.set(s.run_id, []);
+      stepResultsMap.get(s.run_id)!.push({
+        stepId: s.step_id,
+        stepNumber: s.step_number,
+        userStepText: s.user_step_text,
+        normalizedAction: s.normalized_action,
+        observedTarget: s.observed_target,
+        actionResult: s.action_result,
+        assertionResult: s.assertion_result,
+        notes: s.notes,
+        screenshotLabel: s.screenshot_label,
+        screenshotArtifactId: s.screenshot_artifact_id ?? undefined
+      });
+    }
+
+    const artifactRows = db.prepare(`SELECT id, run_id, type, label, content FROM run_artifacts WHERE run_id IN (${placeholders}) ORDER BY ordinal ASC, id ASC`).all(...chunkIds) as (ArtifactRow & { run_id: string })[];
+    for (const a of artifactRows) {
+      if (!artifactsMap.has(a.run_id)) artifactsMap.set(a.run_id, []);
+      artifactsMap.get(a.run_id)!.push({
+        id: a.id,
+        type: a.type,
+        label: a.label,
+        content: a.content
+      });
+    }
   }
 
-  const details = readRunDetails(db, base.id);
-  const metrics = readRunMetrics(db, base.id);
-  const events = readRunEvents(db, base.id);
-  const stepResults = readStepResults(db, base.id);
-  const artifacts = readRunArtifacts(db, base.id);
+  return bases.map(base => {
+    const details = detailsMap.get(base.id);
+    const metrics = metricsMap.get(base.id);
+    const events = eventsMap.get(base.id) ?? [];
+    const stepResults = stepResultsMap.get(base.id) ?? [];
+    const artifacts = artifactsMap.get(base.id) ?? [];
 
-  return normalizeRunRecord({
-    ...base,
-    startedAt: details?.started_at ?? base.startedAt,
-    completedAt: details?.completed_at ?? base.completedAt,
-    cancelRequestedAt: details?.cancel_requested_at ?? base.cancelRequestedAt,
-    currentPhase: details?.current_phase ?? base.currentPhase,
-    currentActivity: details?.current_activity ?? base.currentActivity,
-    currentStepNumber: details?.current_step_number ?? base.currentStepNumber,
-    currentScenarioIndex: details?.current_scenario_index ?? base.currentScenarioIndex,
-    currentScenarioTitle: details?.current_scenario_title ?? base.currentScenarioTitle,
-    summary: details?.summary ?? base.summary,
-    plan: details
-      ? {
-          ...base.plan,
-          featureArea: details.feature_area,
-          environment: details.environment,
-          targetUrl: details.target_url,
-          mode: details.mode,
-          browser: details.browser ?? base.plan.browser,
-          role: details.role,
-          scenarioLibraryId: details.scenario_library_id ?? base.plan.scenarioLibraryId
-        }
-      : base.plan,
-    events: events.length ? events : base.events,
-    stepResults: stepResults.length || metrics?.step_result_count === 0 ? stepResults : base.stepResults,
-    artifacts: artifacts.length || metrics?.artifact_count === 0 ? artifacts : base.artifacts
+    return normalizeRunRecord({
+      ...base,
+      startedAt: details?.started_at ?? base.startedAt,
+      completedAt: details?.completed_at ?? base.completedAt,
+      cancelRequestedAt: details?.cancel_requested_at ?? base.cancelRequestedAt,
+      currentPhase: details?.current_phase ?? base.currentPhase,
+      currentActivity: details?.current_activity ?? base.currentActivity,
+      currentStepNumber: details?.current_step_number ?? base.currentStepNumber,
+      currentScenarioIndex: details?.current_scenario_index ?? base.currentScenarioIndex,
+      currentScenarioTitle: details?.current_scenario_title ?? base.currentScenarioTitle,
+      summary: details?.summary ?? base.summary,
+      plan: details
+        ? {
+            ...base.plan,
+            featureArea: details.feature_area,
+            environment: details.environment,
+            targetUrl: details.target_url,
+            mode: details.mode,
+            browser: details.browser ?? base.plan.browser,
+            role: details.role,
+            scenarioLibraryId: details.scenario_library_id ?? base.plan.scenarioLibraryId
+          }
+        : base.plan,
+      events: events.length ? events : base.events,
+      stepResults: stepResults.length || metrics?.step_result_count === 0 ? stepResults : base.stepResults,
+      artifacts: artifacts.length || metrics?.artifact_count === 0 ? artifacts : base.artifacts
+    });
   });
+}
+
+function hydrateRunRecord(db: Database.Database, row: RunRow | undefined): RunRecord | undefined {
+  if (!row) return undefined;
+  return hydrateRunRecords(db, [row])[0];
 }
 
 function hydrateScenarioLibrary(db: Database.Database, row: ScenarioLibraryRow | undefined): ScenarioLibrary | undefined {
@@ -719,6 +831,203 @@ function writeNormalizedRunTables(db: Database.Database, run: RunRecord): void {
   }
 }
 
+function writeRunRecordsBatch(db: Database.Database, runs: RunRecord[]): void {
+  const chunkSize = 100;
+  for (let i = 0; i < runs.length; i += chunkSize) {
+    const chunk = runs.slice(i, i + chunkSize).map(r => sanitizeRunRecordContent(normalizeRunRecord(r)));
+
+    let stmt = runsStmtCache.get(chunk.length);
+    if (!stmt) {
+      const placeholders = Array.from({ length: chunk.length }, () => "(?, ?, ?, ?, ?)").join(", ");
+      stmt = db.prepare(
+        `INSERT INTO runs (id, created_at, updated_at, status, payload)
+        VALUES ${placeholders}
+        ON CONFLICT(id) DO UPDATE SET
+          created_at = excluded.created_at,
+          updated_at = excluded.updated_at,
+          status = excluded.status,
+          payload = excluded.payload`
+      );
+      runsStmtCache.set(chunk.length, stmt);
+    }
+    stmt.run(...chunk.flatMap(run => [run.id, run.createdAt, run.updatedAt, run.status, JSON.stringify(run)]));
+
+    let detailsStmt = runDetailsStmtCache.get(chunk.length);
+    if (!detailsStmt) {
+      const placeholders = Array.from({ length: chunk.length }, () => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+      detailsStmt = db.prepare(
+        `INSERT INTO run_details (
+          run_id, started_at, completed_at, cancel_requested_at, current_phase, current_activity, current_step_number, current_scenario_index, current_scenario_title, summary, feature_area, environment, target_url, mode, browser, role, scenario_library_id
+        ) VALUES ${placeholders}
+        ON CONFLICT(run_id) DO UPDATE SET
+          started_at = excluded.started_at, completed_at = excluded.completed_at, cancel_requested_at = excluded.cancel_requested_at, current_phase = excluded.current_phase, current_activity = excluded.current_activity, current_step_number = excluded.current_step_number, current_scenario_index = excluded.current_scenario_index, current_scenario_title = excluded.current_scenario_title, summary = excluded.summary, feature_area = excluded.feature_area, environment = excluded.environment, target_url = excluded.target_url, mode = excluded.mode, browser = excluded.browser, role = excluded.role, scenario_library_id = excluded.scenario_library_id`
+      );
+      runDetailsStmtCache.set(chunk.length, detailsStmt);
+    }
+    detailsStmt.run(...chunk.flatMap(run => [
+      run.id, run.startedAt ?? null, run.completedAt ?? null, run.cancelRequestedAt ?? null, run.currentPhase, run.currentActivity ?? null, run.currentStepNumber ?? null, run.currentScenarioIndex ?? null, run.currentScenarioTitle ?? null, run.summary, run.plan.featureArea, run.plan.environment, run.plan.targetUrl, run.plan.mode, run.plan.browser, run.plan.role, run.plan.scenarioLibraryId ?? null
+    ]));
+
+    let metricsStmt = runMetricsStmtCache.get(chunk.length);
+    if (!metricsStmt) {
+      const placeholders = Array.from({ length: chunk.length }, () => "(?, ?, ?, ?, ?, ?)").join(", ");
+      metricsStmt = db.prepare(
+        `INSERT INTO run_metrics (
+          run_id, parsed_step_count, generated_scenario_count, step_result_count, artifact_count, defect_count
+        ) VALUES ${placeholders}
+        ON CONFLICT(run_id) DO UPDATE SET
+          parsed_step_count = excluded.parsed_step_count, generated_scenario_count = excluded.generated_scenario_count, step_result_count = excluded.step_result_count, artifact_count = excluded.artifact_count, defect_count = excluded.defect_count`
+      );
+      runMetricsStmtCache.set(chunk.length, metricsStmt);
+    }
+    metricsStmt.run(...chunk.flatMap(run => [
+      run.id, run.parsedSteps.length, run.generatedScenarios.length, run.stepResults.length, run.artifacts.length, run.defects.length
+    ]));
+
+    const runIds = chunk.map(r => r.id);
+    if (runIds.length > 0) {
+      const placeholders = Array.from({ length: runIds.length }, () => "?").join(", ");
+      db.prepare(`DELETE FROM run_events WHERE run_id IN (${placeholders})`).run(...runIds);
+      db.prepare(`DELETE FROM step_results WHERE run_id IN (${placeholders})`).run(...runIds);
+      db.prepare(`DELETE FROM run_artifacts WHERE run_id IN (${placeholders})`).run(...runIds);
+    }
+
+    const allEvents = chunk.flatMap(r => r.events.map(e => ({ runId: r.id, event: e })));
+    for (let j = 0; j < allEvents.length; j += chunkSize) {
+      const evChunk = allEvents.slice(j, j + chunkSize);
+      let evStmt = runEventsStmtCache.get(evChunk.length);
+      if (!evStmt) {
+        const placeholders = Array.from({ length: evChunk.length }, () => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+        evStmt = db.prepare(
+          `INSERT INTO run_events (
+            id, run_id, timestamp, phase, level, message, category, step_number, scenario_title
+          ) VALUES ${placeholders}`
+        );
+        runEventsStmtCache.set(evChunk.length, evStmt);
+      }
+      evStmt.run(...evChunk.flatMap(({ runId, event }) => [
+        event.id, runId, event.timestamp, event.phase, event.level, event.message, event.category ?? null, event.stepNumber ?? null, event.scenarioTitle ?? null
+      ]));
+    }
+
+    const allStepResults = chunk.flatMap(r => r.stepResults.map(sr => ({ runId: r.id, stepResult: sr })));
+    for (let j = 0; j < allStepResults.length; j += chunkSize) {
+      const srChunk = allStepResults.slice(j, j + chunkSize);
+      let srStmt = stepResultsStmtCache.get(srChunk.length);
+      if (!srStmt) {
+        const placeholders = Array.from({ length: srChunk.length }, () => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+        srStmt = db.prepare(
+          `INSERT INTO step_results (
+            step_id, run_id, step_number, user_step_text, normalized_action, observed_target, action_result, assertion_result, notes, screenshot_label, screenshot_artifact_id
+          ) VALUES ${placeholders}`
+        );
+        stepResultsStmtCache.set(srChunk.length, srStmt);
+      }
+      srStmt.run(...srChunk.flatMap(({ runId, stepResult }) => [
+        stepResult.stepId, runId, stepResult.stepNumber, stepResult.userStepText, stepResult.normalizedAction, stepResult.observedTarget, stepResult.actionResult, stepResult.assertionResult, stepResult.notes, stepResult.screenshotLabel, stepResult.screenshotArtifactId ?? null
+      ]));
+    }
+
+    const allArtifacts = chunk.flatMap(r => r.artifacts.map((a, idx) => ({ runId: r.id, artifact: a, ordinal: idx })));
+    for (let j = 0; j < allArtifacts.length; j += chunkSize) {
+      const aChunk = allArtifacts.slice(j, j + chunkSize);
+      let aStmt = runArtifactsStmtCache.get(aChunk.length);
+      if (!aStmt) {
+        const placeholders = Array.from({ length: aChunk.length }, () => "(?, ?, ?, ?, ?, ?)").join(", ");
+        aStmt = db.prepare(
+          `INSERT INTO run_artifacts (
+            id, run_id, ordinal, type, label, content
+          ) VALUES ${placeholders}`
+        );
+        runArtifactsStmtCache.set(aChunk.length, aStmt);
+      }
+      aStmt.run(...aChunk.flatMap(({ runId, artifact, ordinal }) => [
+        artifact.id, runId, ordinal, artifact.type, artifact.label, artifact.content
+      ]));
+    }
+  }
+}
+
+function writeScenarioLibraryRecordsBatch(db: Database.Database, libraries: ScenarioLibrary[]): void {
+  const chunkSize = 100;
+  for (let i = 0; i < libraries.length; i += chunkSize) {
+    const chunk = libraries.slice(i, i + chunkSize).map(normalizeScenarioLibraryRecord);
+
+    let stmt = scenarioLibrariesStmtCache.get(chunk.length);
+    if (!stmt) {
+      const placeholders = Array.from({ length: chunk.length }, () => "(?, ?, ?, ?, ?, ?)").join(", ");
+      stmt = db.prepare(
+        `INSERT INTO scenario_libraries (id, name, status, author, updated_at, payload)
+         VALUES ${placeholders}
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name, status = excluded.status, author = excluded.author, updated_at = excluded.updated_at, payload = excluded.payload`
+      );
+      scenarioLibrariesStmtCache.set(chunk.length, stmt);
+    }
+    stmt.run(...chunk.flatMap(lib => [lib.id, lib.name, lib.status ?? "active", lib.author ?? "", lib.updatedAt, JSON.stringify(lib)]));
+
+    let detailsStmt = scenarioLibraryDetailsStmtCache.get(chunk.length);
+    if (!detailsStmt) {
+      const placeholders = Array.from({ length: chunk.length }, () => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+      detailsStmt = db.prepare(
+        `INSERT INTO scenario_library_details (
+          library_id, source_run_id, feature_area, environment, target_url, role, created_at, version, risk_summary_json, coverage_gaps_json
+        ) VALUES ${placeholders}
+        ON CONFLICT(library_id) DO UPDATE SET
+          source_run_id = excluded.source_run_id, feature_area = excluded.feature_area, environment = excluded.environment, target_url = excluded.target_url, role = excluded.role, created_at = excluded.created_at, version = excluded.version, risk_summary_json = excluded.risk_summary_json, coverage_gaps_json = excluded.coverage_gaps_json`
+      );
+      scenarioLibraryDetailsStmtCache.set(chunk.length, detailsStmt);
+    }
+    detailsStmt.run(...chunk.flatMap(lib => [
+      lib.id, lib.sourceRunId ?? null, lib.featureArea, lib.environment, lib.targetUrl, lib.role, lib.createdAt, lib.version, JSON.stringify(lib.riskSummary), JSON.stringify(lib.coverageGaps)
+    ]));
+
+    const libraryIds = chunk.map(l => l.id);
+    if (libraryIds.length > 0) {
+      const placeholders = Array.from({ length: libraryIds.length }, () => "?").join(", ");
+      db.prepare(`DELETE FROM scenario_library_versions WHERE library_id IN (${placeholders})`).run(...libraryIds);
+      db.prepare(`DELETE FROM scenario_library_scenarios WHERE library_id IN (${placeholders})`).run(...libraryIds);
+    }
+
+    const allVersions = chunk.flatMap(l => l.versions.map(v => ({ libraryId: l.id, version: v })));
+    for (let j = 0; j < allVersions.length; j += chunkSize) {
+      const vChunk = allVersions.slice(j, j + chunkSize);
+      let vStmt = scenarioLibraryVersionsStmtCache.get(vChunk.length);
+      if (!vStmt) {
+        const placeholders = Array.from({ length: vChunk.length }, () => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+        vStmt = db.prepare(
+          `INSERT INTO scenario_library_versions (
+            library_id, version, created_at, source_run_id, scenario_count, summary, change_summary_json, baseline_insights_json
+          ) VALUES ${placeholders}`
+        );
+        scenarioLibraryVersionsStmtCache.set(vChunk.length, vStmt);
+      }
+      vStmt.run(...vChunk.flatMap(({ libraryId, version }) => [
+        libraryId, version.version, version.createdAt, version.sourceRunId ?? null, version.scenarioCount, version.summary, JSON.stringify(version.changeSummary), JSON.stringify(version.baselineInsights ?? [])
+      ]));
+    }
+
+    const allScenarios = chunk.flatMap(l => l.scenarios.map((s, idx) => ({ libraryId: l.id, scenario: s, ordinal: idx })));
+    for (let j = 0; j < allScenarios.length; j += chunkSize) {
+      const sChunk = allScenarios.slice(j, j + chunkSize);
+      let sStmt = scenarioLibraryScenariosStmtCache.get(sChunk.length);
+      if (!sStmt) {
+        const placeholders = Array.from({ length: sChunk.length }, () => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+        sStmt = db.prepare(
+          `INSERT INTO scenario_library_scenarios (
+            scenario_id, library_id, ordinal, title, priority, type, prerequisites_json, steps_json, expected_result, risk_rationale, approved_for_automation
+          ) VALUES ${placeholders}`
+        );
+        scenarioLibraryScenariosStmtCache.set(sChunk.length, sStmt);
+      }
+      sStmt.run(...sChunk.flatMap(({ libraryId, scenario, ordinal }) => [
+        scenario.id, libraryId, ordinal, scenario.title, scenario.priority, scenario.type, JSON.stringify(scenario.prerequisites), JSON.stringify(scenario.steps), scenario.expectedResult, scenario.riskRationale, scenario.approvedForAutomation ? 1 : 0
+      ]));
+    }
+  }
+}
+
+
 function writeRunRecord(db: Database.Database, run: RunRecord): RunRecord {
   const normalized = sanitizeRunRecordContent(normalizeRunRecord(run));
   const transaction = db.transaction((nextRun: RunRecord) => {
@@ -906,12 +1215,12 @@ function openDatabase(): Database.Database {
     const seed = db.transaction(() => {
       const data = readSeedDataFromJsonStoreSync();
 
-      for (const run of data.runs) {
-        writeRunRecord(db, run);
+      if (data.runs.length > 0) {
+        writeRunRecordsBatch(db, data.runs);
       }
 
-      for (const library of data.scenarioLibraries) {
-        writeScenarioLibraryRecord(db, library);
+      if (data.scenarioLibraries.length > 0) {
+        writeScenarioLibraryRecordsBatch(db, data.scenarioLibraries);
       }
 
       for (const environmentLibrary of data.environmentLibraries) {
@@ -966,7 +1275,7 @@ function createSqliteStoreBackend(): QaStoreBackend {
   function listRunsInternal(): RunRecord[] {
     const db = openDatabase();
     const rows = db.prepare("SELECT id, payload FROM runs ORDER BY created_at DESC").all() as RunRow[];
-    return sortRuns(rows.map((row) => hydrateRunRecord(db, row)).filter((run): run is RunRecord => Boolean(run)));
+    return sortRuns(hydrateRunRecords(db, rows));
   }
 
   function getRunInternal(runId: string): RunRecord | undefined {
