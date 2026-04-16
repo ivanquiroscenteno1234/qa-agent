@@ -111,7 +111,11 @@ async function collectDeepDiscoveryCrawl(page: Page, plan: RunPlan, deps: Pick<D
   visitedViews.push(landingView);
   visitedLabels.add(deps.normalizeText("Landing"));
 
-  const queue = navigationCandidates.map((label) => ({ label, depth: 1, parentLabel: "Landing" }));
+  const queuedLabels = new Set<string>([deps.normalizeText("Landing")]);
+  const queue = navigationCandidates.map((label) => {
+    queuedLabels.add(deps.normalizeText(label));
+    return { label, depth: 1, parentLabel: "Landing" };
+  });
 
   while (queue.length > 0 && visitedViews.length < maxVisitedViews && Date.now() - startedAt < explorationBudgetMs) {
     const current = queue.shift();
@@ -148,11 +152,12 @@ async function collectDeepDiscoveryCrawl(page: Page, plan: RunPlan, deps: Pick<D
 
     for (const childLabel of collectSubviewCandidates(snapshot, deps)) {
       const normalizedChild = deps.normalizeText(childLabel);
-      if (visitedLabels.has(normalizedChild) || queue.some((item) => deps.normalizeText(item.label) === normalizedChild)) {
+      if (visitedLabels.has(normalizedChild) || queuedLabels.has(normalizedChild)) {
         continue;
       }
 
       queue.push({ label: childLabel, depth: current.depth + 1, parentLabel: current.label });
+      queuedLabels.add(normalizedChild);
     }
   }
 
