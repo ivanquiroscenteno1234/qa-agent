@@ -306,13 +306,7 @@ function main() {
 
   transaction();
 
-  const runCount = db.prepare("SELECT COUNT(*) AS count FROM runs").get().count;
-  const libraryCount = db.prepare("SELECT COUNT(*) AS count FROM scenario_libraries").get().count;
   db.close();
-
-  console.log(`Rebuilt SQLite store at ${dbPath}`);
-  console.log(`Imported runs: ${runCount}`);
-  console.log(`Imported scenario libraries: ${libraryCount}`);
 }
 
 main();
