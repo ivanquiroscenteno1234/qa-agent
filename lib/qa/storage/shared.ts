@@ -218,6 +218,16 @@ export function sanitizeOptionalText(value?: string): string | undefined {
   return value ? sanitizeLogMessage(value) : value;
 }
 
+export function sanitizeRunRecord(record: RunRecord): RunRecord {
+  return {
+    ...record,
+    plan: {
+      ...record.plan,
+      loginPassword: record.plan.loginPassword ? "********" : ""
+    }
+  };
+}
+
 export function sanitizeRunRecordContent(record: RunRecord): RunRecord {
   return {
     ...record,
