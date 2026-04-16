@@ -179,43 +179,62 @@ const runArtifactsStmtCache = new Map<number, Database.Statement>();
 const scenarioLibraryVersionsStmtCache = new Map<number, Database.Statement>();
 const scenarioLibraryScenariosStmtCache = new Map<number, Database.Statement>();
 
+const readRunDetailsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readRunMetricsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readRunEventsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readStepResultsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readRunArtifactsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readScenarioLibraryDetailsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readScenarioLibraryVersionsStmt = new WeakMap<Database.Database, Database.Statement>();
+const readScenarioLibraryScenariosStmt = new WeakMap<Database.Database, Database.Statement>();
+
 function readRunDetails(db: Database.Database, runId: string): RunDetailsRow | undefined {
-  return db.prepare(
-    `SELECT
-      run_id,
-      started_at,
-      completed_at,
-      cancel_requested_at,
-      current_phase,
-      current_activity,
-      current_step_number,
-      current_scenario_index,
-      current_scenario_title,
-      summary,
-      feature_area,
-      environment,
-      target_url,
-      mode,
-      browser,
-      role,
-      scenario_library_id
-    FROM run_details
-    WHERE run_id = ?`
-  ).get(runId) as RunDetailsRow | undefined;
+  let stmt = readRunDetailsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        run_id,
+        started_at,
+        completed_at,
+        cancel_requested_at,
+        current_phase,
+        current_activity,
+        current_step_number,
+        current_scenario_index,
+        current_scenario_title,
+        summary,
+        feature_area,
+        environment,
+        target_url,
+        mode,
+        browser,
+        role,
+        scenario_library_id
+      FROM run_details
+      WHERE run_id = ?`
+    );
+    readRunDetailsStmt.set(db, stmt);
+  }
+  return stmt.get(runId) as RunDetailsRow | undefined;
 }
 
 function readRunMetrics(db: Database.Database, runId: string): RunMetricsRow | undefined {
-  return db.prepare(
-    `SELECT
-      run_id,
-      parsed_step_count,
-      generated_scenario_count,
-      step_result_count,
-      artifact_count,
-      defect_count
-    FROM run_metrics
-    WHERE run_id = ?`
-  ).get(runId) as RunMetricsRow | undefined;
+  let stmt = readRunMetricsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        run_id,
+        parsed_step_count,
+        generated_scenario_count,
+        step_result_count,
+        artifact_count,
+        defect_count
+      FROM run_metrics
+      WHERE run_id = ?`
+    );
+    readRunMetricsStmt.set(db, stmt);
+  }
+  return stmt.get(runId) as RunMetricsRow | undefined;
 }
 
 function readRunEvents(db: Database.Database, runId: string): RunEvent[] {
@@ -279,16 +298,21 @@ function readStepResults(db: Database.Database, runId: string): RunRecord["stepR
 }
 
 function readRunArtifacts(db: Database.Database, runId: string): Artifact[] {
-  const rows = db.prepare(
-    `SELECT
-      id,
-      type,
-      label,
-      content
-    FROM run_artifacts
-    WHERE run_id = ?
-    ORDER BY ordinal ASC, id ASC`
-  ).all(runId) as ArtifactRow[];
+  let stmt = readRunArtifactsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        id,
+        type,
+        label,
+        content
+      FROM run_artifacts
+      WHERE run_id = ?
+      ORDER BY ordinal ASC, id ASC`
+    );
+    readRunArtifactsStmt.set(db, stmt);
+  }
+  const rows = stmt.all(runId) as ArtifactRow[];
 
   return rows.map((row) => ({
     id: row.id,
@@ -298,12 +322,18 @@ function readRunArtifacts(db: Database.Database, runId: string): Artifact[] {
   }));
 }
 
+const readRunArtifactStmt = new WeakMap<Database.Database, Database.Statement>();
 function readRunArtifact(db: Database.Database, runId: string, artifactId: string): Artifact | undefined {
-  const row = db.prepare(
-    `SELECT id, type, label, content
-    FROM run_artifacts
-    WHERE run_id = ? AND id = ?`
-  ).get(runId, artifactId) as ArtifactRow | undefined;
+  let stmt = readRunArtifactStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT id, type, label, content
+      FROM run_artifacts
+      WHERE run_id = ? AND id = ?`
+    );
+    readRunArtifactStmt.set(db, stmt);
+  }
+  const row = stmt.get(runId, artifactId) as ArtifactRow | undefined;
 
   return row
     ? {
@@ -316,37 +346,47 @@ function readRunArtifact(db: Database.Database, runId: string, artifactId: strin
 }
 
 function readScenarioLibraryDetails(db: Database.Database, libraryId: string): ScenarioLibraryDetailsRow | undefined {
-  return db.prepare(
-    `SELECT
-      library_id,
-      source_run_id,
-      feature_area,
-      environment,
-      target_url,
-      role,
-      created_at,
-      version,
-      risk_summary_json,
-      coverage_gaps_json
-    FROM scenario_library_details
-    WHERE library_id = ?`
-  ).get(libraryId) as ScenarioLibraryDetailsRow | undefined;
+  let stmt = readScenarioLibraryDetailsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        library_id,
+        source_run_id,
+        feature_area,
+        environment,
+        target_url,
+        role,
+        created_at,
+        version,
+        risk_summary_json,
+        coverage_gaps_json
+      FROM scenario_library_details
+      WHERE library_id = ?`
+    );
+    readScenarioLibraryDetailsStmt.set(db, stmt);
+  }
+  return stmt.get(libraryId) as ScenarioLibraryDetailsRow | undefined;
 }
 
 function readScenarioLibraryVersions(db: Database.Database, libraryId: string): ScenarioLibrary["versions"] {
-  const rows = db.prepare(
-    `SELECT
-      version,
-      created_at,
-      source_run_id,
-      scenario_count,
-      summary,
-      change_summary_json,
-      baseline_insights_json
-    FROM scenario_library_versions
-    WHERE library_id = ?
-    ORDER BY version ASC`
-  ).all(libraryId) as ScenarioLibraryVersionRow[];
+  let stmt = readScenarioLibraryVersionsStmt.get(db);
+  if (!stmt) {
+    stmt = db.prepare(
+      `SELECT
+        version,
+        created_at,
+        source_run_id,
+        scenario_count,
+        summary,
+        change_summary_json,
+        baseline_insights_json
+      FROM scenario_library_versions
+      WHERE library_id = ?
+      ORDER BY version ASC`
+    );
+    readScenarioLibraryVersionsStmt.set(db, stmt);
+  }
+  const rows = stmt.all(libraryId) as ScenarioLibraryVersionRow[];
 
   return rows.map((row) => {
     const baselineInsights = JSON.parse(row.baseline_insights_json || '[]') as AnalysisInsight[];
