@@ -78,4 +78,13 @@ describe("titleCase", () => {
   it("should handle strings with numbers", () => {
     expect(titleCase("step 1 part 2")).toBe("Step 1 Part 2");
   });
+
+  it("should handle leading and trailing separators", () => {
+    expect(titleCase("  _hello-world_  ")).toBe("Hello World");
+  });
+
+  it("should handle single character strings", () => {
+    expect(titleCase("a")).toBe("A");
+    expect(titleCase("Z")).toBe("Z");
+  });
 });
