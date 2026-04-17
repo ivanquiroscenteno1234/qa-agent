@@ -54,5 +54,3 @@ if (failures.length) {
   }
   process.exit(1);
 }
-
-console.log("Credential secret verification passed.");
