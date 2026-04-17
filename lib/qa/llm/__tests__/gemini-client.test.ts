@@ -221,6 +221,30 @@ describe("GeminiClient", () => {
       expect(warnMessage).not.toContain("test-api-key");
       expect(warnMessage).toContain("[REDACTED]");
     });
+
+    it("redacts API key when it contains characters that are JSON-escaped", async () => {
+      const trickyKey = "test\"key\\with\nnewlines";
+      const trickyClient = new GeminiClient(trickyKey, "gemini-2.5-flash");
+
+      const jsonEscapedKey = JSON.stringify(trickyKey).slice(1, -1);
+
+      mockGenerateContent.mockRejectedValueOnce(
+        new Error(`{"error": "Failed with key ${jsonEscapedKey}"}`)
+      );
+
+      await trickyClient.analyzeRun({
+        featureArea: "Y",
+        mode: "exploratory-session",
+        stepResults: [],
+        warnings: [],
+        discoverySurface: []
+      });
+
+      const warnMessage = warnSpy.mock.calls[0]?.join(" ") ?? "";
+      expect(warnMessage).not.toContain(trickyKey);
+      expect(warnMessage).not.toContain(jsonEscapedKey);
+      expect(warnMessage).toContain("[REDACTED]");
+    });
   });
 
   describe("normalizeSteps error sanitization", () => {
