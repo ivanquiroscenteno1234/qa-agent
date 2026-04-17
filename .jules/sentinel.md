@@ -7,3 +7,8 @@
 **Vulnerability:** The artifact download endpoint (`app/api/runs/[runId]/artifacts/[artifactId]/route.ts`) previously allowed reading arbitrary server files if a malicious path was injected into the `artifact.content` database field.
 **Learning:** Checking if a path starts with a directory string without appending the path separator (`path.sep`) creates a prefix-matching loophole (e.g., `.data/artifacts` matches `.data/artifacts_secret/secrets.txt`).
 **Prevention:** When validating safe file paths, always use `path.resolve` to normalize the path and ensure it strictly starts with the base directory appended with `path.sep` (e.g., `absolutePath.startsWith(artifactDirectory + path.sep)`).
+
+## 2025-10-24 - Security Headers Defense in Depth
+**Vulnerability:** Next.js by default lacks standard HTTP security headers (like HSTS, XSS Protection, Frame Options). This missing defense-in-depth leaves the app vulnerable to classes of client-side attacks (e.g. clickjacking, MIME sniffing, connection downgrades).
+**Learning:** Adding standard headers via Next.js `next.config.ts` configuration provides global protection efficiently across all routes without individual route configuration.
+**Prevention:** Always implement standard security headers in the initial project configuration to guard against common client-side exploits and enforce safe HTTP interactions.
