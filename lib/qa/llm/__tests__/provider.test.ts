@@ -57,6 +57,26 @@ describe("getQaLlmClient", () => {
   });
 });
 
+describe("resetQaLlmClient", () => {
+  it("clears the cached client so a new one is created on next getQaLlmClient call", () => {
+    withEnv({ QA_LLM_ENABLED: "false" }, () => {
+      const client1 = getQaLlmClient();
+      const client2 = getQaLlmClient();
+
+      // Should be cached
+      expect(client1).toBe(client2);
+
+      resetQaLlmClient();
+
+      const client3 = getQaLlmClient();
+
+      // Should be a new instance after reset
+      expect(client3).not.toBe(client1);
+      expect(client3).toBeInstanceOf(NoopLlmClient);
+    });
+  });
+});
+
 describe("NoopLlmClient", () => {
   const noop = new NoopLlmClient();
 
