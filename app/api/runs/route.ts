@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { formatZodError, runPlanSchema, validateRunPlanForMode } from "@/lib/qa/plan-validation";
 import { createRun, listRuns } from "@/lib/qa/store";
-import { protectCredentialSecret } from "@/lib/qa/credential-secret";
 import { sanitizeRunRecord } from "@/lib/qa/storage/shared";
 
 export async function GET() {
@@ -24,12 +23,10 @@ export async function POST(request: Request) {
   }
 
   const plan = parsed.data;
-  // Security: strip inline credentials from the persisted plan when a saved
-  // credential profile is selected — the library record holds the secret.
-  // Otherwise, ensure the inline password is encrypted before storage.
-  const persistedPlan = plan.credentialLibraryId
-    ? { ...plan, loginEmail: "", loginPassword: "" }
-    : { ...plan, loginPassword: protectCredentialSecret(plan.loginPassword) ?? "" };
+  // Security: always strip inline credentials from the persisted plan.
+  // When a saved credential profile is selected, the library record holds the secret.
+  // For local exploratory checks without a profile, we must not persist the raw password.
+  const persistedPlan = { ...plan, loginEmail: "", loginPassword: "" };
 
   const run = await createRun(persistedPlan);
   return NextResponse.json({ run: sanitizeRunRecord(run) }, { status: 201 });
