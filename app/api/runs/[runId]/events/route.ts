@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { getRun, listRunEvents } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 
 export async function GET(_request: Request, context: { params: Promise<{ runId: string }> }) {
   const { runId } = await context.params;
-  const run = await getRun(runId);
+  const run = await getQaStoreBackend().getRun(runId);
 
   if (!run) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
@@ -14,7 +14,7 @@ export async function GET(_request: Request, context: { params: Promise<{ runId:
     runId,
     currentPhase: run.currentPhase,
     status: run.status,
-    events: await listRunEvents(runId),
+    events: await getQaStoreBackend().listRunEvents(runId),
     warnings: run.warnings
   });
 }

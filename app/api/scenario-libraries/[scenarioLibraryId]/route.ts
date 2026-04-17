@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { archiveScenarioLibrary, deleteScenarioLibrary, duplicateScenarioLibrary, getScenarioLibrary, renameScenarioLibrary } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 
 const patchSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("rename"), name: z.string().min(1).max(200) }),
@@ -15,7 +15,7 @@ interface RouteContext {
 
 export async function GET(_request: Request, context: RouteContext) {
   const { scenarioLibraryId } = await context.params;
-  const library = await getScenarioLibrary(scenarioLibraryId);
+  const library = await getQaStoreBackend().getScenarioLibrary(scenarioLibraryId);
 
   if (!library) {
     return NextResponse.json({ error: "Scenario library not found" }, { status: 404 });
@@ -26,7 +26,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   const { scenarioLibraryId } = await context.params;
-  const library = await getScenarioLibrary(scenarioLibraryId);
+  const library = await getQaStoreBackend().getScenarioLibrary(scenarioLibraryId);
 
   if (!library) {
     return NextResponse.json({ error: { code: "NOT_FOUND", message: "The selected scenario library was not found." } }, { status: 404 });
@@ -43,22 +43,22 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   if (parsed.data.action === "rename") {
-    const updated = await renameScenarioLibrary(scenarioLibraryId, parsed.data.name);
+    const updated = await getQaStoreBackend().renameScenarioLibrary(scenarioLibraryId, parsed.data.name);
     return NextResponse.json({ scenarioLibrary: updated });
   }
 
   if (parsed.data.action === "duplicate") {
-    const duplicate = await duplicateScenarioLibrary(scenarioLibraryId, parsed.data.name);
+    const duplicate = await getQaStoreBackend().duplicateScenarioLibrary(scenarioLibraryId, parsed.data.name);
     return NextResponse.json({ scenarioLibrary: duplicate }, { status: 201 });
   }
 
-  const updated = await archiveScenarioLibrary(scenarioLibraryId);
+  const updated = await getQaStoreBackend().archiveScenarioLibrary(scenarioLibraryId);
   return NextResponse.json({ scenarioLibrary: updated });
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
   const { scenarioLibraryId } = await context.params;
-  const library = await getScenarioLibrary(scenarioLibraryId);
+  const library = await getQaStoreBackend().getScenarioLibrary(scenarioLibraryId);
 
   if (!library) {
     return NextResponse.json(
@@ -68,7 +68,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
 
   try {
-    await deleteScenarioLibrary(scenarioLibraryId);
+    await getQaStoreBackend().deleteScenarioLibrary(scenarioLibraryId);
   } catch (error) {
     if (error instanceof Error && error.message === "SCENARIO_LIBRARY_IN_USE") {
       return NextResponse.json(

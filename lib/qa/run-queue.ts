@@ -1,4 +1,4 @@
-import { appendRunEvent, getRun, saveRun, updateRunState } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 import { executeRun } from "@/lib/qa/execution-engine";
 
 const activeRunIds = new Set<string>();
@@ -9,13 +9,13 @@ function isStartable(status: string): boolean {
 
 async function processQueuedRun(runId: string): Promise<void> {
   try {
-    const run = await getRun(runId);
+    const run = await getQaStoreBackend().getRun(runId);
     if (!run || run.status === "cancelled") {
       return;
     }
 
     const startedAt = run.startedAt ?? new Date().toISOString();
-    const preparingRun = await updateRunState(runId, {
+    const preparingRun = await getQaStoreBackend().updateRunState(runId, {
       status: "running",
       currentPhase: "preparing",
       startedAt,
@@ -27,7 +27,7 @@ async function processQueuedRun(runId: string): Promise<void> {
       updatedAt: new Date().toISOString()
     });
 
-    await appendRunEvent(runId, {
+    await getQaStoreBackend().appendRunEvent(runId, {
       phase: "preparing",
       level: "info",
       message: "Run left the queue and is preparing execution.",
@@ -40,8 +40,8 @@ async function processQueuedRun(runId: string): Promise<void> {
 
     const executed = await executeRun(preparingRun);
     const completedAt = executed.completedAt ?? new Date().toISOString();
-    await saveRun({ ...executed, completedAt });
-    await appendRunEvent(runId, {
+    await getQaStoreBackend().saveRun({ ...executed, completedAt });
+    await getQaStoreBackend().appendRunEvent(runId, {
       phase: executed.currentPhase,
       level: executed.status === "fail" ? "error" : executed.status === "blocked" ? "warning" : "info",
       message: `Run completed with status ${executed.status}.`,
@@ -49,7 +49,7 @@ async function processQueuedRun(runId: string): Promise<void> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown queue execution error.";
-    await updateRunState(runId, {
+    await getQaStoreBackend().updateRunState(runId, {
       status: "fail",
       currentPhase: "reporting",
       currentActivity: "Queue execution failed before the run could complete.",
@@ -60,7 +60,7 @@ async function processQueuedRun(runId: string): Promise<void> {
       completedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
-    await appendRunEvent(runId, {
+    await getQaStoreBackend().appendRunEvent(runId, {
       phase: "reporting",
       level: "error",
       message,
@@ -72,7 +72,7 @@ async function processQueuedRun(runId: string): Promise<void> {
 }
 
 export async function enqueueRun(runId: string) {
-  const run = await getRun(runId);
+  const run = await getQaStoreBackend().getRun(runId);
 
   if (!run) {
     return { ok: false as const, reason: "not-found" };
@@ -86,7 +86,7 @@ export async function enqueueRun(runId: string) {
     return { ok: false as const, reason: "not-startable", run };
   }
 
-  const queuedRun = await updateRunState(runId, {
+  const queuedRun = await getQaStoreBackend().updateRunState(runId, {
     status: "queued",
     currentPhase: "queued",
     currentActivity: "Waiting in the local execution queue.",
@@ -94,7 +94,7 @@ export async function enqueueRun(runId: string) {
     updatedAt: new Date().toISOString()
   });
 
-  await appendRunEvent(runId, {
+  await getQaStoreBackend().appendRunEvent(runId, {
     phase: "queued",
     level: "info",
     message: "Run queued for execution.",

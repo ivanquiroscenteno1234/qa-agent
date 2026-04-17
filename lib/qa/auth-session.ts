@@ -1,7 +1,7 @@
 import type { Locator, Page } from "playwright";
 
 import { revealCredentialSecret } from "@/lib/qa/credential-secret";
-import { getStoredCredentialLibrary, touchCredentialLibraryLastUsed } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 import type { ParsedStep, RunPlan } from "@/lib/types";
 
 type LoginOutcome = { observedTarget: string; actionResult: string; notes: string };
@@ -24,7 +24,7 @@ export async function resolveCredentials(plan: RunPlan, parsedSteps: ParsedStep[
   // Prefer stored credential profile when one is linked — inline fields may
   // have been stripped from the persisted plan (Gap 9.1).
   if ((plan.credentialLibraryId ?? "").trim()) {
-    const credential = await getStoredCredentialLibrary(plan.credentialLibraryId ?? "");
+    const credential = await getQaStoreBackend().getStoredCredentialLibrary(plan.credentialLibraryId ?? "");
 
     if (!credential) {
       throw new Error("The selected saved credential profile could not be found.");
@@ -35,7 +35,7 @@ export async function resolveCredentials(plan: RunPlan, parsedSteps: ParsedStep[
     }
 
     if (credential.password) {
-      await touchCredentialLibraryLastUsed(credential.id);
+      await getQaStoreBackend().touchCredentialLibraryLastUsed(credential.id);
       return { email: credential.username, password: revealCredentialSecret(credential.password) ?? "" };
     }
 

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { deleteRun, getRun } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 import { sanitizeRunRecord } from "@/lib/qa/storage/shared";
 
 export async function GET(_request: Request, context: { params: Promise<{ runId: string }> }) {
   const { runId } = await context.params;
-  const run = await getRun(runId);
+  const run = await getQaStoreBackend().getRun(runId);
 
   if (!run) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
@@ -16,7 +16,7 @@ export async function GET(_request: Request, context: { params: Promise<{ runId:
 
 export async function DELETE(_request: Request, context: { params: Promise<{ runId: string }> }) {
   const { runId } = await context.params;
-  const run = await getRun(runId);
+  const run = await getQaStoreBackend().getRun(runId);
 
   if (!run) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
@@ -29,6 +29,6 @@ export async function DELETE(_request: Request, context: { params: Promise<{ run
     );
   }
 
-  await deleteRun(runId);
+  await getQaStoreBackend().deleteRun(runId);
   return new NextResponse(null, { status: 204 });
 }

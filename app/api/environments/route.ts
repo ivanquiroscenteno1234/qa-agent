@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { formatZodError, isValidTargetUrl } from "@/lib/qa/plan-validation";
-import { listEnvironmentLibraries, upsertEnvironmentLibrary } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 
 const environmentLibraryInputSchema = z.object({
   name: z.string().trim().min(1),
@@ -20,7 +20,7 @@ const environmentLibraryInputSchema = z.object({
 });
 
 export async function GET() {
-  return NextResponse.json({ environmentLibraries: await listEnvironmentLibraries() });
+  return NextResponse.json({ environmentLibraries: await getQaStoreBackend().listEnvironmentLibraries() });
 }
 
 export async function POST(request: Request) {
@@ -31,5 +31,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
   }
 
-  return NextResponse.json({ environmentLibrary: await upsertEnvironmentLibrary(parsed.data) }, { status: 201 });
+  return NextResponse.json({ environmentLibrary: await getQaStoreBackend().upsertEnvironmentLibrary(parsed.data) }, { status: 201 });
 }

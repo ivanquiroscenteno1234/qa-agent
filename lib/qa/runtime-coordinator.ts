@@ -1,4 +1,4 @@
-import { appendRunEvent, appendRunWarning, getRun, updateRunState } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 import type { FailureCategory, RunRecord } from "@/lib/types";
 
 export class RunCancelledError extends Error {
@@ -13,7 +13,7 @@ export function isCancellationError(error: unknown): error is RunCancelledError 
 }
 
 export async function ensureRunNotCancelled(runId: string): Promise<void> {
-  const run = await getRun(runId);
+  const run = await getQaStoreBackend().getRun(runId);
 
   if (run?.cancelRequestedAt || run?.status === "cancelled") {
     throw new RunCancelledError();
@@ -26,7 +26,7 @@ export async function emitEvent(
   message: string,
   options?: { level?: "info" | "warning" | "error"; category?: FailureCategory; stepNumber?: number; scenarioTitle?: string }
 ): Promise<void> {
-  await appendRunEvent(runId, {
+  await getQaStoreBackend().appendRunEvent(runId, {
     phase,
     level: options?.level ?? "info",
     message,
@@ -43,7 +43,7 @@ export async function emitWarning(
   category: FailureCategory,
   options?: { stepNumber?: number; scenarioTitle?: string; recoverable?: boolean }
 ): Promise<void> {
-  await appendRunWarning(runId, {
+  await getQaStoreBackend().appendRunWarning(runId, {
     phase,
     message,
     category,
@@ -58,7 +58,7 @@ export async function persistCheckpoint(
   patch: Partial<RunRecord>,
   event?: { message: string; level?: "info" | "warning" | "error"; category?: FailureCategory; stepNumber?: number; scenarioTitle?: string }
 ): Promise<void> {
-  await updateRunState(record.id, {
+  await getQaStoreBackend().updateRunState(record.id, {
     ...patch,
     updatedAt: new Date().toISOString()
   });

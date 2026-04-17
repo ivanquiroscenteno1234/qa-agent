@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { NextResponse } from "next/server";
 
-import { getRun, getRunArtifact } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 
 function sanitizeFilename(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "artifact";
@@ -13,13 +13,13 @@ export async function GET(_request: Request, context: { params: Promise<{ runId:
   const { runId, artifactId } = await context.params;
   const requestUrl = new URL(_request.url);
   const shouldDownload = requestUrl.searchParams.get("download") === "1";
-  const run = await getRun(runId);
+  const run = await getQaStoreBackend().getRun(runId);
 
   if (!run) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
   }
 
-  const artifact = await getRunArtifact(runId, artifactId);
+  const artifact = await getQaStoreBackend().getRunArtifact(runId, artifactId);
 
   if (!artifact) {
     return NextResponse.json({ error: "Artifact not found" }, { status: 404 });

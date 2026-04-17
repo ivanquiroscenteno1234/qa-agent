@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getScenarioLibrary } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 
 interface PageProps {
   params: Promise<{ scenarioLibraryId: string }>;
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { scenarioLibraryId } = await params;
-  const library = await getScenarioLibrary(scenarioLibraryId);
+  const library = await getQaStoreBackend().getScenarioLibrary(scenarioLibraryId);
   return {
     title: library ? `${library.name} History | QA Command Center` : "Library History | QA Command Center",
     description: "Inspect the version history of a saved scenario library."
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ScenarioLibraryHistoryPage({ params }: PageProps) {
   const { scenarioLibraryId } = await params;
-  const library = await getScenarioLibrary(scenarioLibraryId);
+  const library = await getQaStoreBackend().getScenarioLibrary(scenarioLibraryId);
 
   if (!library) {
     notFound();

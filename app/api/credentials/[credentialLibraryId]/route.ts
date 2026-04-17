@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { formatZodError } from "@/lib/qa/plan-validation";
-import { deleteCredentialLibrary, getStoredCredentialLibrary, upsertCredentialLibrary } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 
 const credentialLibraryInputSchema = z.object({
   label: z.string().trim().min(1),
@@ -20,7 +20,7 @@ interface RouteContext {
 
 export async function PATCH(request: Request, context: RouteContext) {
   const { credentialLibraryId } = await context.params;
-  const existing = await getStoredCredentialLibrary(credentialLibraryId);
+  const existing = await getQaStoreBackend().getStoredCredentialLibrary(credentialLibraryId);
 
   if (!existing) {
     return NextResponse.json(
@@ -50,12 +50,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  return NextResponse.json({ credentialLibrary: await upsertCredentialLibrary(parsed.data, credentialLibraryId) });
+  return NextResponse.json({ credentialLibrary: await getQaStoreBackend().upsertCredentialLibrary(parsed.data, credentialLibraryId) });
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
   const { credentialLibraryId } = await context.params;
-  const existing = await getStoredCredentialLibrary(credentialLibraryId);
+  const existing = await getQaStoreBackend().getStoredCredentialLibrary(credentialLibraryId);
 
   if (!existing) {
     return NextResponse.json(
@@ -65,7 +65,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
 
   try {
-    await deleteCredentialLibrary(credentialLibraryId);
+    await getQaStoreBackend().deleteCredentialLibrary(credentialLibraryId);
   } catch (error) {
     if (error instanceof Error && error.message === "CREDENTIAL_IN_USE") {
       return NextResponse.json(

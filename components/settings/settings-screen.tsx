@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SectionFrame } from "@/components/ui/section-frame";
 import { getQaLlmConfig } from "@/lib/qa/llm/config";
 import { buildCredentialVaultCards, buildEnvironmentCards } from "@/lib/qa/settings-view-model";
-import { listCredentialLibraries, listEnvironmentLibraries, listRuns, listScenarioLibraries } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 
 interface SettingsScreenProps {
   storeBackendLabel?: string;
@@ -17,10 +17,10 @@ interface SettingsScreenProps {
 
 export async function SettingsScreen({ storeBackendLabel = "json" }: SettingsScreenProps) {
   const [runs, libraries, environments, credentials] = await Promise.all([
-    listRuns(),
-    listScenarioLibraries(),
-    listEnvironmentLibraries(),
-    listCredentialLibraries()
+    getQaStoreBackend().listRuns(),
+    getQaStoreBackend().listScenarioLibraries(),
+    getQaStoreBackend().listEnvironmentLibraries(),
+    getQaStoreBackend().listCredentialLibraries()
   ]);
   const credentialCards = buildCredentialVaultCards(credentials, runs);
   const environmentCards = buildEnvironmentCards(environments, runs, libraries);

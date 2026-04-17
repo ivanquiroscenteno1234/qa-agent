@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { formatZodError } from "@/lib/qa/plan-validation";
-import { listCredentialLibraries, upsertCredentialLibrary } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 
 const credentialLibraryInputSchema = z.object({
   label: z.string().trim().min(1),
@@ -15,7 +15,7 @@ const credentialLibraryInputSchema = z.object({
 });
 
 export async function GET() {
-  return NextResponse.json({ credentialLibraries: await listCredentialLibraries() });
+  return NextResponse.json({ credentialLibraries: await getQaStoreBackend().listCredentialLibraries() });
 }
 
 export async function POST(request: Request) {
@@ -40,5 +40,5 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ credentialLibrary: await upsertCredentialLibrary(parsed.data) }, { status: 201 });
+  return NextResponse.json({ credentialLibrary: await getQaStoreBackend().upsertCredentialLibrary(parsed.data) }, { status: 201 });
 }

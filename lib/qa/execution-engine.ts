@@ -32,7 +32,7 @@ import {
 import { executeScenarioSuiteRun as runScenarioSuiteFlow } from "@/lib/qa/scenario-executor";
 import { generateScenarios } from "@/lib/qa/scenario-generator";
 import { cleanLabel, expandedTerms, normalizeText, selectDiscoveryLabels, toRegex } from "@/lib/qa/text-runtime";
-import { getScenarioLibrary, updateRunState } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 import { sanitizeLogMessage } from "@/lib/qa/storage/shared";
 import type { Artifact, DefectCandidate, ParsedStep, RunPlan, RunRecord, StepResult, StepStatus } from "@/lib/types";
 
@@ -167,7 +167,7 @@ export async function executeRun(record: RunRecord): Promise<RunRecord> {
   const stepResults: StepResult[] = [];
 
   await context.tracing.start({ screenshots: true, snapshots: true });
-  await updateRunState(record.id, {
+  await getQaStoreBackend().updateRunState(record.id, {
     status: "running",
     currentPhase: "executing",
     startedAt: record.startedAt ?? new Date().toISOString(),
@@ -189,7 +189,7 @@ export async function executeRun(record: RunRecord): Promise<RunRecord> {
       // Attach insight comparison if a linked library baseline is available
       if (record.plan.scenarioLibraryId) {
         try {
-          const library = await getScenarioLibrary(record.plan.scenarioLibraryId);
+          const library = await getQaStoreBackend().getScenarioLibrary(record.plan.scenarioLibraryId);
           const latestVersion = library?.versions?.at(-1);
           if (latestVersion?.baselineInsights?.length) {
             const comparison = computeInsightComparison(

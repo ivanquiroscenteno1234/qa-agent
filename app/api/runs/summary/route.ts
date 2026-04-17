@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { listRunSummaries } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 import type { ListRunSummariesOptions } from "@/lib/qa/storage/types";
 import type { RunStatus } from "@/lib/types";
 
@@ -20,5 +20,5 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status") as RunStatus | null;
   if (status) options.statusFilter = status;
 
-  return NextResponse.json({ runs: await listRunSummaries(options) });
+  return NextResponse.json({ runs: await getQaStoreBackend().listRunSummaries(options) });
 }

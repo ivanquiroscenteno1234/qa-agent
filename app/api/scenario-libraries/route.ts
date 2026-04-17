@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { listScenarioLibraries, upsertScenarioLibraryFromRun } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 import { formatZodError, runPlanSchema } from "@/lib/qa/plan-validation";
 
 const scenarioLibraryMutationSchema = z.object({
@@ -45,7 +45,7 @@ const scenarioLibraryMutationSchema = z.object({
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const includeArchived = url.searchParams.get("includeArchived") === "true";
-  return NextResponse.json({ scenarioLibraries: await listScenarioLibraries(includeArchived ? { includeArchived: true } : undefined) });
+  return NextResponse.json({ scenarioLibraries: await getQaStoreBackend().listScenarioLibraries(includeArchived ? { includeArchived: true } : undefined) });
 }
 
 export async function POST(request: Request) {
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const scenarioLibrary = await upsertScenarioLibraryFromRun(
+  const scenarioLibrary = await getQaStoreBackend().upsertScenarioLibraryFromRun(
     plan,
     generated,
     sourceRunId,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getScenarioLibrary } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 
 interface RouteContext {
   params: Promise<{ scenarioLibraryId: string }>;
@@ -8,7 +8,7 @@ interface RouteContext {
 
 export async function GET(_request: Request, context: RouteContext) {
   const { scenarioLibraryId } = await context.params;
-  const library = await getScenarioLibrary(scenarioLibraryId);
+  const library = await getQaStoreBackend().getScenarioLibrary(scenarioLibraryId);
 
   if (!library) {
     return NextResponse.json({ error: "Scenario library not found" }, { status: 404 });

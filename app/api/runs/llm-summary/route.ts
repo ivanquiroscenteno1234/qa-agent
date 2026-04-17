@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { listRuns } from "@/lib/qa/store";
+import { getQaStoreBackend } from "@/lib/qa/storage/backend";
 
 export interface LlmUsageSummary {
   totalCompleted: number;
@@ -10,7 +10,7 @@ export interface LlmUsageSummary {
 }
 
 export async function GET(): Promise<NextResponse> {
-  const runs = await listRuns();
+  const runs = await getQaStoreBackend().listRuns();
   const completed = runs.filter((r) => r.status === "pass" || r.status === "fail" || r.status === "blocked" || r.status === "inconclusive" || r.status === "cancelled");
 
   const summary: LlmUsageSummary = {
