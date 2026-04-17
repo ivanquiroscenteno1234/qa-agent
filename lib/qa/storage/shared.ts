@@ -204,11 +204,15 @@ export function sanitizeLogMessage(value: string): string {
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
   if (geminiKey && geminiKey.length >= 8) {
     redacted = redacted.replaceAll(geminiKey, "[REDACTED]");
+    redacted = redacted.replaceAll(JSON.stringify(geminiKey).slice(1, -1), "[REDACTED]");
+    redacted = redacted.replaceAll(encodeURIComponent(geminiKey), "[REDACTED]");
   }
 
   const qaSecretKey = process.env.QA_LOCAL_SECRET_KEY?.trim();
   if (qaSecretKey && qaSecretKey.length >= 8) {
     redacted = redacted.replaceAll(qaSecretKey, "[REDACTED]");
+    redacted = redacted.replaceAll(JSON.stringify(qaSecretKey).slice(1, -1), "[REDACTED]");
+    redacted = redacted.replaceAll(encodeURIComponent(qaSecretKey), "[REDACTED]");
   }
 
   return redacted;
