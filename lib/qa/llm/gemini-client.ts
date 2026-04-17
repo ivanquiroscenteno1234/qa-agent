@@ -52,7 +52,29 @@ export class GeminiClient implements QaLlmClient {
     // Strip any API key substrings from logged error messages
     const raw = err instanceof Error ? err.message : String(err);
     const key = this.apiKey || (process.env.GEMINI_API_KEY ?? "");
-    return key ? raw.replaceAll(key, "[REDACTED]") : raw;
+    if (!key) return raw;
+
+    let redacted = raw.replaceAll(key, "[REDACTED]");
+
+    try {
+      const jsonEscapedKey = JSON.stringify(key).slice(1, -1);
+      if (jsonEscapedKey !== key) {
+        redacted = redacted.replaceAll(jsonEscapedKey, "[REDACTED]");
+      }
+    } catch {
+      // Ignore stringify errors
+    }
+
+    try {
+      const urlEncodedKey = encodeURIComponent(key);
+      if (urlEncodedKey !== key) {
+        redacted = redacted.replaceAll(urlEncodedKey, "[REDACTED]");
+      }
+    } catch {
+      // Ignore encode errors
+    }
+
+    return redacted;
   }
 
   async normalizeSteps(input: NormalizeStepsInput): Promise<LlmCapabilityResult<NormalizeStepsResponse>> {
