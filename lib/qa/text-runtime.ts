@@ -31,8 +31,16 @@ const stopWords = new Set([
   "menu view"
 ]);
 
+// ⚡ Bolt: Cache normalized text to prevent redundant expensive regex string replacements and Unicode normalization
+const normalizeTextCache = new Map<string, string>();
+
 export function normalizeText(value: string): string {
-  return value
+  const cached = normalizeTextCache.get(value);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const normalized = value
     .replace(/Ã¡/g, "a")
     .replace(/Ã©/g, "e")
     .replace(/Ã­/g, "i")
@@ -45,6 +53,12 @@ export function normalizeText(value: string): string {
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
+
+  if (normalizeTextCache.size > 10000) {
+    normalizeTextCache.clear();
+  }
+  normalizeTextCache.set(value, normalized);
+  return normalized;
 }
 
 export function cleanLabel(value: string): string {

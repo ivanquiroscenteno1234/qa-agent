@@ -20,3 +20,6 @@
 ## 2024-04-18 - SQLite Batch Query Hydration Optimization
 **Learning:** Refactoring list queries to use chunked `WHERE IN (?, ...)` fetching instead of querying relational data on a row-by-row mapping strategy drastically reduces overhead by mitigating the N+1 query problem, making listing robust without relying on prepared statement micro-optimizations.
 **Action:** When working on collection queries mapping multiple relations, leverage bulk fetch algorithms immediately and ensure proper array chunking (e.g. 100 rows per query) to avoid variable bind limits.
+## 2024-08-01 - Memoize expensive unicode string operations in discovery loop
+**Learning:** `normalizeText` performs several regex string replacements and Unicode normalizations (`.normalize("NFD")`). Because it is heavily utilized in graph traversals for discovery tasks—where the same navigation labels and DOM inputs are repeatedly matched—it consumes significant event loop ticks inside Node.js.
+**Action:** Use a memoized module-scoped cache `Map` for simple, fast-path lookups when repeatedly normalizing known UI element text to avoid duplicate computation on the exact same strings.
