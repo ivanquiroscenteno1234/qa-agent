@@ -92,10 +92,32 @@ describe("Run View Model", () => {
       expect(isRunActive("running")).toBe(true);
     });
 
+    it("should return true for cancelling status", () => {
+      expect(isRunActive("cancelling")).toBe(true);
+    });
+
     it("should return false for other statuses", () => {
       const inactiveStatuses: RunStatus[] = ["draft", "pass", "fail", "blocked", "cancelled", "inconclusive"];
       inactiveStatuses.forEach((status) => {
         expect(isRunActive(status)).toBe(false);
+      });
+    });
+
+    it("should correctly handle every possible RunStatus value", () => {
+      const allStatuses: { status: RunStatus; expected: boolean }[] = [
+        { status: "draft", expected: false },
+        { status: "queued", expected: true },
+        { status: "running", expected: true },
+        { status: "cancelling", expected: true },
+        { status: "pass", expected: false },
+        { status: "fail", expected: false },
+        { status: "blocked", expected: false },
+        { status: "cancelled", expected: false },
+        { status: "inconclusive", expected: false },
+      ];
+
+      allStatuses.forEach(({ status, expected }) => {
+        expect(isRunActive(status), `Status "${status}" should return ${expected}`).toBe(expected);
       });
     });
   });

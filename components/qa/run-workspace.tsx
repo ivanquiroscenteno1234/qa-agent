@@ -39,11 +39,14 @@ export function RunWorkspace({
         </div>
 
         <div className="run-shell">
-          <aside className="run-list">
+          <aside className="run-list" role="listbox" aria-label="Runs">
             {runs.map((run) => (
               <button
                 key={run.id}
                 type="button"
+                role="option"
+                aria-selected={selectedRun?.id === run.id}
+                aria-label={`View details for ${run.plan.featureArea} run on ${run.plan.environment} (${run.status})`}
                 className={`run-row ${selectedRun?.id === run.id ? "run-row-active" : ""}`}
                 onClick={() => onSelectRun(run)}
               >

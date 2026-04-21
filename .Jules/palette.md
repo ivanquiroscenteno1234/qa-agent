@@ -10,3 +10,7 @@
 ## 2024-04-15 - Added Tooltips to Disabled Buttons
 **Learning:** Adding a `title` attribute to disabled buttons is an easy way to provide contextual inline feedback, explaining the missing criteria or the reason why the button is currently inactive, which significantly improves user experience.
 **Action:** Always provide contextual feedback for disabled interactive elements.
+
+## 2024-05-18 - Added ARIA Label and Role to Interactive Lists
+**Learning:** List items that function as selectable options (like the list of runs in the workspace) often lack necessary context for screen reader users when built with generic buttons. Screen readers might announce them simply as buttons, leaving the user unaware that they represent items in a selectable list.
+**Action:** Always add `role="listbox"`, `role="option"`, `aria-label`, and `aria-selected` to lists of interactive items to ensure users understand the structure and the current state of their selection.
