@@ -118,7 +118,7 @@ const modeLabels: Record<QaMode, string> = {
 
 const riskOptions: RiskLevel[] = ["low", "moderate", "high"];
 
-const activeRunStatuses: RunStatus[] = ["queued", "running"];
+const activeRunStatuses: RunStatus[] = ["queued", "running", "cancelling"];
 const terminalRunStatuses: RunStatus[] = ["pass", "fail", "blocked", "cancelled", "inconclusive"];
 
 type WorkflowView = "draft" | "monitor" | "review";

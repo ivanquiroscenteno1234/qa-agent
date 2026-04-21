@@ -14,7 +14,7 @@ export type ScenarioType =
   | "regression"
   | "exploratory";
 
-export type RunStatus = "draft" | "queued" | "running" | "pass" | "fail" | "blocked" | "cancelled" | "inconclusive";
+export type RunStatus = "draft" | "queued" | "running" | "cancelling" | "pass" | "fail" | "blocked" | "cancelled" | "inconclusive";
 
 export type RunPhase = "intake" | "queued" | "preparing" | "executing" | "reporting" | "cancelled";
 
