@@ -43,7 +43,7 @@ export interface ReviewComparisonViewModel {
 }
 
 export function isRunActive(status: RunStatus): boolean {
-  return status === "queued" || status === "running";
+  return ["queued", "running", "cancelling"].includes(status);
 }
 
 export function buildMonitorSummary(runs: RunSummary[]): MonitorSummaryViewModel {
