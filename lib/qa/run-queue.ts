@@ -4,7 +4,7 @@ import { executeRun } from "@/lib/qa/execution-engine";
 const activeRunIds = new Set<string>();
 
 function isStartable(status: string): boolean {
-  return !["queued", "running", "pass", "fail", "blocked", "cancelled"].includes(status);
+  return !["queued", "running", "cancelling", "pass", "fail", "blocked", "cancelled"].includes(status);
 }
 
 async function processQueuedRun(runId: string): Promise<void> {
