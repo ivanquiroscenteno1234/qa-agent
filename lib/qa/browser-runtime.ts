@@ -30,12 +30,9 @@ export function resolveBrowser(browserName: string, normalizeText: (value: strin
 }
 
 export async function findFirstVisible(locator: Locator): Promise<Locator | null> {
-  const count = await locator.count();
-  for (let index = 0; index < count; index += 1) {
-    const candidate = locator.nth(index);
-    if (await candidate.isVisible().catch(() => false)) {
-      return candidate;
-    }
+  const firstVisible = locator.filter({ visible: true }).first();
+  if (await firstVisible.isVisible().catch(() => false)) {
+    return firstVisible;
   }
   return null;
 }
