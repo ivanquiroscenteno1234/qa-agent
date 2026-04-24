@@ -58,14 +58,13 @@ export async function firstVisibleByPatterns(page: Page, patterns: string[], dep
     }
   }
 
-  const semanticCandidates = page.locator('button, a, [role="tab"], [role="button"], h1, h2, h3, h4, [data-testid]');
+  // ⚡ Bolt: Leverage Playwright's optimized internal engine with `.filter({ visible: true })`
+  // instead of sequential loops with `isVisible()` to significantly reduce network latency over CDP
+  const semanticCandidates = page.locator('button, a, [role="tab"], [role="button"], h1, h2, h3, h4, [data-testid]').filter({ visible: true });
   const count = await semanticCandidates.count();
 
   for (let index = 0; index < count; index += 1) {
     const candidate = semanticCandidates.nth(index);
-    if (!(await candidate.isVisible().catch(() => false))) {
-      continue;
-    }
 
     const text = deps.normalizeText((await candidate.textContent()) ?? "");
     if (!text) {

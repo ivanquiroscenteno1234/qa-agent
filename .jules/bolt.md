@@ -20,3 +20,6 @@
 ## 2024-04-18 - SQLite Batch Query Hydration Optimization
 **Learning:** Refactoring list queries to use chunked `WHERE IN (?, ...)` fetching instead of querying relational data on a row-by-row mapping strategy drastically reduces overhead by mitigating the N+1 query problem, making listing robust without relying on prepared statement micro-optimizations.
 **Action:** When working on collection queries mapping multiple relations, leverage bulk fetch algorithms immediately and ensure proper array chunking (e.g. 100 rows per query) to avoid variable bind limits.
+## 2024-04-24 - Playwright CDP Network Latency Optimization
+**Learning:** Sequential calls to `.isVisible()` inside loops traversing Playwright element lists create significant O(N) network bottlenecks over the Chrome DevTools Protocol (CDP). Each check requires a full roundtrip to the browser context, slowing down component interactions and discovery engines considerably when dealing with dense UI surfaces.
+**Action:** Always leverage Playwright's optimized internal engine by using `locator.filter({ visible: true })` directly on the base locator before counting or iterating. This resolves the visible elements on the browser side in a single operation, reducing O(N) network latency to O(1).
