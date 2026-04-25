@@ -14,3 +14,6 @@
 ## 2024-05-18 - Added ARIA Label and Role to Interactive Lists
 **Learning:** List items that function as selectable options (like the list of runs in the workspace) often lack necessary context for screen reader users when built with generic buttons. Screen readers might announce them simply as buttons, leaving the user unaware that they represent items in a selectable list.
 **Action:** Always add `role="listbox"`, `role="option"`, `aria-label`, and `aria-selected` to lists of interactive items to ensure users understand the structure and the current state of their selection.
+## 2024-10-27 - Monitor Run List Accessibility
+**Learning:** Adding ARIA roles to custom UI interactive lists (like the mission queue in `RunListPanel`) significantly improves screen reader navigation and clearly conveys the "selected" state without modifying visual styling. Using `role="listbox"`, `role="option"`, and `aria-selected` handles selection state accessibly.
+**Action:** When implementing interactive lists or selectable cards, always ensure container roles (`listbox`) and child roles (`option`) are properly paired with `aria-selected` to convey state to assistive technology.
