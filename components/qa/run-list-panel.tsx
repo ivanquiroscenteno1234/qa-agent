@@ -29,7 +29,7 @@ export function RunListPanel({ runs, selectedRunId, emptyListMessage, onSelectRu
         </div>
       </div>
 
-      <div className="monitor-run-list">
+      <div className="monitor-run-list" role="listbox" aria-label="Mission Queue">
         {items.map((item) => {
           const run = runs.find((candidate) => candidate.id === item.id);
 
@@ -42,6 +42,8 @@ export function RunListPanel({ runs, selectedRunId, emptyListMessage, onSelectRu
               aria-label={`View run details for ${item.featureArea} (${item.status})`}
               key={item.id}
               type="button"
+              role="option"
+              aria-selected={selectedRunId === item.id}
               className={`monitor-run-card ${selectedRunId === item.id ? "monitor-run-card-active" : ""}`}
               onClick={() => onSelectRun(run)}
             >
