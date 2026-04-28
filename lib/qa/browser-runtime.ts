@@ -30,7 +30,10 @@ export function resolveBrowser(browserName: string, normalizeText: (value: strin
 }
 
 export async function findFirstVisible(locator: Locator): Promise<Locator | null> {
-  const firstVisible = locator.filter({ visible: true }).first();
+  // ⚡ Bolt: Replaced `locator.filter({ visible: true })` with `:scope:visible`.
+  // Playwright's `filter` ignores the `visible` property. Using `:scope:visible`
+  // pushes the visibility check to the browser engine, eliminating O(N) CDP network latency.
+  const firstVisible = locator.locator(':scope:visible').first();
   if (await firstVisible.isVisible().catch(() => false)) {
     return firstVisible;
   }
