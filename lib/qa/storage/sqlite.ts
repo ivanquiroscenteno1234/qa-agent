@@ -185,6 +185,16 @@ const scenarioLibraryDetailsStmtCache = new Map<number, Database.Statement>();
 const scenarioLibraryVersionsStmtCache = new Map<number, Database.Statement>();
 const scenarioLibraryScenariosStmtCache = new Map<number, Database.Statement>();
 
+const hydrateRunDetailsStmtCache = new Map<number, Database.Statement>();
+const hydrateRunMetricsStmtCache = new Map<number, Database.Statement>();
+const hydrateRunEventsStmtCache = new Map<number, Database.Statement>();
+const hydrateStepResultsStmtCache = new Map<number, Database.Statement>();
+const hydrateRunArtifactsStmtCache = new Map<number, Database.Statement>();
+
+const hydrateScenarioLibraryDetailsStmtCache = new Map<number, Database.Statement>();
+const hydrateScenarioLibraryVersionsStmtCache = new Map<number, Database.Statement>();
+const hydrateScenarioLibraryScenariosStmtCache = new Map<number, Database.Statement>();
+
 const readRunDetailsStmt = new WeakMap<Database.Database, Database.Statement>();
 const readRunMetricsStmt = new WeakMap<Database.Database, Database.Statement>();
 const readRunEventsStmt = new WeakMap<Database.Database, Database.Statement>();
@@ -524,15 +534,32 @@ function hydrateRunRecords(db: Database.Database, rows: RunRow[]): RunRecord[] {
   const chunkSize = 100;
   for (let i = 0; i < bases.length; i += chunkSize) {
     const chunkIds = bases.slice(i, i + chunkSize).map(b => b.id);
-    const placeholders = chunkIds.map(() => "?").join(", ");
 
-    const detailsRows = db.prepare(`SELECT run_id, started_at, completed_at, cancel_requested_at, current_phase, current_activity, current_step_number, current_scenario_index, current_scenario_title, summary, feature_area, environment, target_url, mode, browser, role, scenario_library_id FROM run_details WHERE run_id IN (${placeholders})`).all(...chunkIds) as RunDetailsRow[];
+    let detailsStmt = hydrateRunDetailsStmtCache.get(chunkIds.length);
+    if (!detailsStmt) {
+      const placeholders = chunkIds.map(() => "?").join(", ");
+      detailsStmt = db.prepare(`SELECT run_id, started_at, completed_at, cancel_requested_at, current_phase, current_activity, current_step_number, current_scenario_index, current_scenario_title, summary, feature_area, environment, target_url, mode, browser, role, scenario_library_id FROM run_details WHERE run_id IN (${placeholders})`);
+      hydrateRunDetailsStmtCache.set(chunkIds.length, detailsStmt);
+    }
+    const detailsRows = detailsStmt.all(...chunkIds) as RunDetailsRow[];
     for (const d of detailsRows) detailsMap.set(d.run_id, d);
 
-    const metricsRows = db.prepare(`SELECT run_id, parsed_step_count, generated_scenario_count, step_result_count, artifact_count, defect_count FROM run_metrics WHERE run_id IN (${placeholders})`).all(...chunkIds) as RunMetricsRow[];
+    let metricsStmt = hydrateRunMetricsStmtCache.get(chunkIds.length);
+    if (!metricsStmt) {
+      const placeholders = chunkIds.map(() => "?").join(", ");
+      metricsStmt = db.prepare(`SELECT run_id, parsed_step_count, generated_scenario_count, step_result_count, artifact_count, defect_count FROM run_metrics WHERE run_id IN (${placeholders})`);
+      hydrateRunMetricsStmtCache.set(chunkIds.length, metricsStmt);
+    }
+    const metricsRows = metricsStmt.all(...chunkIds) as RunMetricsRow[];
     for (const m of metricsRows) metricsMap.set(m.run_id, m);
 
-    const eventRows = db.prepare(`SELECT id, run_id, timestamp, phase, level, message, category, step_number, scenario_title FROM run_events WHERE run_id IN (${placeholders}) ORDER BY timestamp ASC, id ASC`).all(...chunkIds) as (RunEventRow & { run_id: string })[];
+    let eventsStmt = hydrateRunEventsStmtCache.get(chunkIds.length);
+    if (!eventsStmt) {
+      const placeholders = chunkIds.map(() => "?").join(", ");
+      eventsStmt = db.prepare(`SELECT id, run_id, timestamp, phase, level, message, category, step_number, scenario_title FROM run_events WHERE run_id IN (${placeholders}) ORDER BY timestamp ASC, id ASC`);
+      hydrateRunEventsStmtCache.set(chunkIds.length, eventsStmt);
+    }
+    const eventRows = eventsStmt.all(...chunkIds) as (RunEventRow & { run_id: string })[];
     for (const e of eventRows) {
       if (!eventsMap.has(e.run_id)) eventsMap.set(e.run_id, []);
       eventsMap.get(e.run_id)!.push({
@@ -547,7 +574,13 @@ function hydrateRunRecords(db: Database.Database, rows: RunRow[]): RunRecord[] {
       });
     }
 
-    const stepRows = db.prepare(`SELECT step_id, run_id, step_number, user_step_text, normalized_action, observed_target, action_result, assertion_result, notes, screenshot_label, screenshot_artifact_id FROM step_results WHERE run_id IN (${placeholders}) ORDER BY step_number ASC, step_id ASC`).all(...chunkIds) as (StepResultRow & { run_id: string })[];
+    let stepsStmt = hydrateStepResultsStmtCache.get(chunkIds.length);
+    if (!stepsStmt) {
+      const placeholders = chunkIds.map(() => "?").join(", ");
+      stepsStmt = db.prepare(`SELECT step_id, run_id, step_number, user_step_text, normalized_action, observed_target, action_result, assertion_result, notes, screenshot_label, screenshot_artifact_id FROM step_results WHERE run_id IN (${placeholders}) ORDER BY step_number ASC, step_id ASC`);
+      hydrateStepResultsStmtCache.set(chunkIds.length, stepsStmt);
+    }
+    const stepRows = stepsStmt.all(...chunkIds) as (StepResultRow & { run_id: string })[];
     for (const s of stepRows) {
       if (!stepResultsMap.has(s.run_id)) stepResultsMap.set(s.run_id, []);
       stepResultsMap.get(s.run_id)!.push({
@@ -564,7 +597,13 @@ function hydrateRunRecords(db: Database.Database, rows: RunRow[]): RunRecord[] {
       });
     }
 
-    const artifactRows = db.prepare(`SELECT id, run_id, type, label, content FROM run_artifacts WHERE run_id IN (${placeholders}) ORDER BY ordinal ASC, id ASC`).all(...chunkIds) as (ArtifactRow & { run_id: string })[];
+    let artifactsStmt = hydrateRunArtifactsStmtCache.get(chunkIds.length);
+    if (!artifactsStmt) {
+      const placeholders = chunkIds.map(() => "?").join(", ");
+      artifactsStmt = db.prepare(`SELECT id, run_id, type, label, content FROM run_artifacts WHERE run_id IN (${placeholders}) ORDER BY ordinal ASC, id ASC`);
+      hydrateRunArtifactsStmtCache.set(chunkIds.length, artifactsStmt);
+    }
+    const artifactRows = artifactsStmt.all(...chunkIds) as (ArtifactRow & { run_id: string })[];
     for (const a of artifactRows) {
       if (!artifactsMap.has(a.run_id)) artifactsMap.set(a.run_id, []);
       artifactsMap.get(a.run_id)!.push({
@@ -631,18 +670,35 @@ function hydrateScenarioLibraries(db: Database.Database, rows: ScenarioLibraryRo
   const chunkSize = 100;
   for (let i = 0; i < bases.length; i += chunkSize) {
     const chunkIds = bases.slice(i, i + chunkSize).map(b => b.id);
-    const placeholders = chunkIds.map(() => "?").join(", ");
 
-    const detailsRows = db.prepare(`SELECT library_id, source_run_id, feature_area, environment, target_url, role, created_at, version, risk_summary_json, coverage_gaps_json FROM scenario_library_details WHERE library_id IN (${placeholders})`).all(...chunkIds) as ScenarioLibraryDetailsRow[];
+    let detailsStmt = hydrateScenarioLibraryDetailsStmtCache.get(chunkIds.length);
+    if (!detailsStmt) {
+      const placeholders = chunkIds.map(() => "?").join(", ");
+      detailsStmt = db.prepare(`SELECT library_id, source_run_id, feature_area, environment, target_url, role, created_at, version, risk_summary_json, coverage_gaps_json FROM scenario_library_details WHERE library_id IN (${placeholders})`);
+      hydrateScenarioLibraryDetailsStmtCache.set(chunkIds.length, detailsStmt);
+    }
+    const detailsRows = detailsStmt.all(...chunkIds) as ScenarioLibraryDetailsRow[];
     for (const d of detailsRows) detailsMap.set(d.library_id, d);
 
-    const versionRows = db.prepare(`SELECT library_id, version, created_at, source_run_id, scenario_count, summary, change_summary_json, baseline_insights_json FROM scenario_library_versions WHERE library_id IN (${placeholders}) ORDER BY version ASC`).all(...chunkIds) as (ScenarioLibraryVersionRow & { library_id: string })[];
+    let versionsStmt = hydrateScenarioLibraryVersionsStmtCache.get(chunkIds.length);
+    if (!versionsStmt) {
+      const placeholders = chunkIds.map(() => "?").join(", ");
+      versionsStmt = db.prepare(`SELECT library_id, version, created_at, source_run_id, scenario_count, summary, change_summary_json, baseline_insights_json FROM scenario_library_versions WHERE library_id IN (${placeholders}) ORDER BY version ASC`);
+      hydrateScenarioLibraryVersionsStmtCache.set(chunkIds.length, versionsStmt);
+    }
+    const versionRows = versionsStmt.all(...chunkIds) as (ScenarioLibraryVersionRow & { library_id: string })[];
     for (const v of versionRows) {
       if (!versionsMap.has(v.library_id)) versionsMap.set(v.library_id, []);
       versionsMap.get(v.library_id)!.push(v);
     }
 
-    const scenarioRows = db.prepare(`SELECT library_id, scenario_id, ordinal, title, priority, type, prerequisites_json, steps_json, expected_result, risk_rationale, approved_for_automation FROM scenario_library_scenarios WHERE library_id IN (${placeholders}) ORDER BY ordinal ASC, scenario_id ASC`).all(...chunkIds) as (ScenarioLibraryScenarioRow & { library_id: string })[];
+    let scenariosStmt = hydrateScenarioLibraryScenariosStmtCache.get(chunkIds.length);
+    if (!scenariosStmt) {
+      const placeholders = chunkIds.map(() => "?").join(", ");
+      scenariosStmt = db.prepare(`SELECT library_id, scenario_id, ordinal, title, priority, type, prerequisites_json, steps_json, expected_result, risk_rationale, approved_for_automation FROM scenario_library_scenarios WHERE library_id IN (${placeholders}) ORDER BY ordinal ASC, scenario_id ASC`);
+      hydrateScenarioLibraryScenariosStmtCache.set(chunkIds.length, scenariosStmt);
+    }
+    const scenarioRows = scenariosStmt.all(...chunkIds) as (ScenarioLibraryScenarioRow & { library_id: string })[];
     for (const s of scenarioRows) {
       if (!scenariosMap.has(s.library_id)) scenariosMap.set(s.library_id, []);
       scenariosMap.get(s.library_id)!.push(s);
