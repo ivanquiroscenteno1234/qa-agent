@@ -7,14 +7,12 @@ export async function discoverNavigationCandidates(
   const navigationLocator = page.locator('nav button, nav a, [role="navigation"] button, [role="navigation"] a');
   const fallbackLocator = page.locator('button, a, [role="button"], [role="link"]');
   const source = (await navigationLocator.count()) > 0 ? navigationLocator : fallbackLocator;
-  const count = await source.count();
+  const visibleSource = source.locator(':scope:visible');
+  const count = await visibleSource.count();
   const labels: string[] = [];
 
   for (let index = 0; index < count; index += 1) {
-    const candidate = source.nth(index);
-    if (!(await candidate.isVisible().catch(() => false))) {
-      continue;
-    }
+    const candidate = visibleSource.nth(index);
 
     const text = deps.cleanLabel((await candidate.textContent()) ?? "");
     const role = await candidate.getAttribute("role").catch(() => null);
