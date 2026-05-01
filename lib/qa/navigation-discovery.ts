@@ -6,15 +6,15 @@ export async function discoverNavigationCandidates(
 ): Promise<string[]> {
   const navigationLocator = page.locator('nav button, nav a, [role="navigation"] button, [role="navigation"] a');
   const fallbackLocator = page.locator('button, a, [role="button"], [role="link"]');
-  const source = (await navigationLocator.count()) > 0 ? navigationLocator : fallbackLocator;
+  const baseSource = (await navigationLocator.count()) > 0 ? navigationLocator : fallbackLocator;
+  // ⚡ Bolt: Pushed visibility filtering to the browser engine using `.and(page.locator(':visible'))`.
+  // This eliminates O(N) CDP network latency from sequential `isVisible()` checks.
+  const source = baseSource.and(page.locator(':visible'));
   const count = await source.count();
   const labels: string[] = [];
 
   for (let index = 0; index < count; index += 1) {
     const candidate = source.nth(index);
-    if (!(await candidate.isVisible().catch(() => false))) {
-      continue;
-    }
 
     const text = deps.cleanLabel((await candidate.textContent()) ?? "");
     const role = await candidate.getAttribute("role").catch(() => null);
