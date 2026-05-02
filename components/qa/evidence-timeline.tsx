@@ -61,7 +61,7 @@ export function EvidenceTimeline({ runId, stepResults, parsedSteps, artifacts }:
               <strong>{item.title}</strong>
               <p className="muted timeline-evidence-detail">{item.detail}</p>
               {item.screenshotArtifact ? (
-                <a href={`/api/runs/${runId}/artifacts/${item.screenshotArtifact.id}?download=1`} target="_blank" rel="noreferrer">
+                <a href={`/api/runs/${runId}/artifacts/${item.screenshotArtifact.id}?download=1`} target="_blank" rel="noopener noreferrer">
                   Open linked screenshot
                 </a>
               ) : null}
