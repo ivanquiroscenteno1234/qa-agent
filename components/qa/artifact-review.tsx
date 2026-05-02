@@ -224,7 +224,7 @@ export function ArtifactReview({ runId, artifacts }: ArtifactReviewProps) {
                     <h3>{artifact.label}</h3>
                     <p className="muted">{summarizeArtifact(artifact)}</p>
                   </div>
-                  <a href={`/api/runs/${runId}/artifacts/${artifact.id}?download=1`} target="_blank" rel="noreferrer">
+                  <a href={`/api/runs/${runId}/artifacts/${artifact.id}?download=1`} target="_blank" rel="noopener noreferrer">
                     Download
                   </a>
                 </div>
