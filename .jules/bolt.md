@@ -24,3 +24,7 @@
 ## 2026-04-27 - Playwright O(N) CDP Network Latency Bottleneck
 **Learning:** Sequential `.isVisible()` loops inside text matchers or nested filters, and using `locator.filter({ visible: true })` (which actually ignores the `visible` property since Playwright's `filter` method only accepts `has`/`hasNot`/`hasText`/`hasNotText`) create substantial O(N) network latency bottlenecks over the CDP protocol.
 **Action:** Always utilize the `:visible` pseudo-class (e.g., `locator.locator(':visible').first()`) directly on Playwright locators instead of `locator.filter({ visible: true })`. This shifts the iterative visibility checks entirely to the browser, significantly accelerating UI discovery processes.
+
+## 2024-05-15 - Playwright :scope:visible searches descendants instead of current collection
+**Learning:** Using `locator.locator(':scope:visible')` does not filter the current element collection for visibility natively. Instead, it searches the descendants subtree, which inherently returns zero elements for the current element. This is not a viable alternative to `locator.filter({ visible: true })` (which actually ignores the `visible` property since Playwright's `filter` method only accepts `has`/`hasNot`/`hasText`/`hasNotText`).
+**Action:** Always utilize `.and(page.locator(':visible'))` (e.g., `locator.and(locator.page().locator(':visible')).first()`) to filter the current element collection natively in the browser engine without searching descendants, eliminating O(N) CDP network latency.
