@@ -84,6 +84,7 @@ export function EnvironmentCard({ environment }: EnvironmentCardProps) {
           aria-label="Delete environment profile"
           type="button"
           disabled={isDeleting}
+          title={isDeleting ? "Deleting profile..." : undefined}
           onClick={handleDelete}
         >
           {isDeleting ? "Deleting…" : "Delete"}

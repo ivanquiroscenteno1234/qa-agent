@@ -76,7 +76,7 @@ export function CredentialVaultCard({ credential }: CredentialVaultCardProps) {
           aria-label="Delete credential profile"
           type="button"
           disabled={isInlineEntry || isDeleting}
-          title={isInlineEntry ? "Inline entry rows cannot be deleted — they are generated from run history." : undefined}
+          title={isDeleting ? "Deleting profile..." : (isInlineEntry ? "Inline entry rows cannot be deleted — they are generated from run history." : undefined)}
           onClick={handleDelete}
         >
           {isDeleting ? "Deleting…" : "Delete"}
