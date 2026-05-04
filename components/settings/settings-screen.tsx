@@ -45,7 +45,7 @@ export async function SettingsScreen({ storeBackendLabel = "json" }: SettingsScr
       utilityNavItems={[
         { id: "library", label: "Library", eyebrow: `${libraries.length} saved`, href: "/library" },
         { id: "settings", label: "Settings", eyebrow: "Local posture", active: true, href: "/settings" },
-        { id: "archives", label: "Archives", eyebrow: "Later", disabled: true }
+        { id: "archives", label: "Archives", eyebrow: "Later", disabled: true, disabledReason: "Archive access is not yet implemented." }
       ]}
       primaryAction={{
         label: "Open Draft",
