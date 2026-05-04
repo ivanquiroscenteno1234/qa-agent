@@ -17,3 +17,7 @@
 ## 2026-04-28 - Added ARIA Label and Role to Interactive Lists
 **Learning:** List items that function as selectable options (like the list of runs in the workspace) often lack necessary context for screen reader users when built with generic buttons. Screen readers might announce them simply as buttons, leaving the user unaware that they represent items in a selectable list.
 **Action:** Always add `role="listbox"`, `role="option"`, an accurate `aria-label` (e.g. "Run List", not a hallucinated value), and `aria-selected` to lists of interactive items to ensure users understand the structure and the current state of their selection.
+
+## 2024-05-18 - Disabled Structural Nav Need Context
+**Learning:** Adding an optional `disabledReason` property to structural navigation interfaces (like `SideNavItem`) and surfacing it via the native `title` attribute provides consistent, low-friction contextual feedback when links are disabled, similar to how disabled action buttons are treated.
+**Action:** When creating structural navigation components that support a disabled state, ensure the API surface accepts a reason and renders it as an accessible tooltip for screen readers and pointer devices.
