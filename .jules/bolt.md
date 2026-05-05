@@ -24,3 +24,6 @@
 ## 2026-04-27 - Playwright O(N) CDP Network Latency Bottleneck
 **Learning:** Sequential `.isVisible()` loops inside text matchers or nested filters, and using `locator.filter({ visible: true })` (which actually ignores the `visible` property since Playwright's `filter` method only accepts `has`/`hasNot`/`hasText`/`hasNotText`) create substantial O(N) network latency bottlenecks over the CDP protocol.
 **Action:** Always utilize the `:visible` pseudo-class (e.g., `locator.locator(':visible').first()`) directly on Playwright locators instead of `locator.filter({ visible: true })`. This shifts the iterative visibility checks entirely to the browser, significantly accelerating UI discovery processes.
+## 2024-05-24 - Array Iteration Bottleneck
+**Learning:** Sequential `.filter().length` calls on large arrays (like `runs` in `lib/qa/run-view-model.ts`) can create an O(kN) bottleneck. The overhead of iterating the array multiple times can be significant.
+**Action:** Replace multiple sequential `.filter().length` or `.map()` calls with a single `.reduce()` or `for...of` loop pass when extracting multiple distinct metrics or subsets from the same large dataset, yielding measurable performance improvements.
