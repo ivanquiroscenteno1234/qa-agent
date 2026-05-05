@@ -1096,7 +1096,7 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
       utilityNavItems={[
         { id: "library", label: "Library", eyebrow: "Browse", href: "/library" },
         { id: "settings", label: "Settings", eyebrow: "Config", href: "/settings" },
-        { id: "archives", label: "Archives", eyebrow: "Later", disabled: true }
+        { id: "archives", label: "Archives", eyebrow: "Later", disabled: true, disabledReason: "Archives are only accessible from the Library view." }
       ]}
       primaryAction={{
         label: "New Mission",
