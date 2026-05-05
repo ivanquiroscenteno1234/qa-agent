@@ -8,6 +8,7 @@ export interface SideNavItem {
   eyebrow?: string;
   active?: boolean;
   disabled?: boolean;
+  disabledReason?: string;
   href?: Route;
   onClick?: () => void;
 }
@@ -45,6 +46,7 @@ function renderItem(item: SideNavItem) {
       onClick={item.onClick}
       disabled={item.disabled}
       aria-current={item.active ? "page" : undefined}
+      title={item.disabledReason || undefined}
     >
       <span className="side-nav-item-label">{item.label}</span>
       {item.eyebrow ? <span className="side-nav-item-eyebrow">{item.eyebrow}</span> : null}
