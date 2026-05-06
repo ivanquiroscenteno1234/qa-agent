@@ -324,9 +324,18 @@ export function QaCommandCenter({ initialWorkflowView = "draft", storeBackendLab
   const activeSelectedRun = selectedRun?.id === selectedRunId ? selectedRun : null;
   const draftHandoffScenarioLibraryId = searchParams.get("scenarioLibraryId")?.trim() ?? "";
 
-  const activeRunCount = runs.filter((run) => isActiveRun(run.status)).length;
-  const completedRunCount = runs.filter((run) => isTerminalRun(run.status)).length;
-  const draftRunCount = runs.filter((run) => run.status === "draft").length;
+  // ⚡ Bolt Performance Optimization:
+  // Reduced O(3N) array traversal overhead and eliminated 3 intermediate array allocations
+  // by replacing three sequential `.filter().length` calls with a single `.reduce()` pass.
+  const { activeRunCount, completedRunCount, draftRunCount } = runs.reduce(
+    (acc, run) => {
+      if (isActiveRun(run.status)) acc.activeRunCount++;
+      else if (isTerminalRun(run.status)) acc.completedRunCount++;
+      else if (run.status === "draft") acc.draftRunCount++;
+      return acc;
+    },
+    { activeRunCount: 0, completedRunCount: 0, draftRunCount: 0 }
+  );
   const planWarnings = buildRunPlanWarnings(plan);
   const parseValidationErrors = getParseValidationErrors(plan);
   const parseValidationMessages = parseValidationErrors.map((error) =>
